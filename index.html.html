@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 - Числовая Головоломка</title>
+    
+    <!-- VK Play SDK -->
+    <script src="https://unpkg.com/@vkid/sdk@2.x/dist/sdk.js"></script>
+    
+    <style>
+        /* Все предыдущие стили остаются без изменений */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            overflow: hidden !important;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #FAF8EF;
+            color: #776E65;
+            padding: 20px;
+            touch-action: manipulation;
+        }
+
+        .game-container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .game-title {
+            font-size: 60px;
+            font-weight: bold;
+            color: #776E65;
+        }
+
+        .scores-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .score-box {
+            background: #BBADA0;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-align: center;
+            min-width: 100px;
+        }
+
+        .score-label {
+            color: #EEE4DA;
+            font-size: 14px;
+        }
+
+        .score-value {
+            color: white;
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .game-grid {
+            background: #BBADA0;
+            border-radius: 10px;
+            padding: 10px;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            aspect-ratio: 1;
+        }
+
+        .grid-cell {
+            background: #CDC1B4;
+            border-radius: 5px;
+        }
+
+        .tile {
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 32px;
+            font-weight: bold;
+            border-radius: 5px;
+            transition: all 0.15s ease;
+            z-index: 2;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        .tile-2 { background: #EEE4DA; color: #776E65; }
+        .tile-4 { background: #EDE0C8; color: #776E65; }
+        .tile-8 { background: #F2B179; color: white; }
+        .tile-16 { background: #F59563; color: white; }
+        .tile-32 { background: #F67C5F; color: white; }
+        .tile-64 { background: #F65E3B; color: white; }
+        .tile-128 { background: #EDCF72; color: white; font-size: 28px; }
+        .tile-256 { background: #EDCC61; color: white; font-size: 28px; }
+        .tile-512 { background: #EDC850; color: white; font-size: 28px; }
+        .tile-1024 { background: #EDC53F; color: white; font-size: 24px; }
+        .tile-2048 { background: #EDC22E; color: white; font-size: 24px; }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .new-game-btn {
+            background: #8F7A66;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            margin: 5px;
+        }
+
+        .new-game-btn:hover {
+            background: #7F6A56;
+        }
+
+        .shop-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin: 5px;
+        }
+
+        .shop-btn:hover {
+            background: #45a049;
+        }
+
+        .buy-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .buy-btn:hover {
+            background: #1976D2;
+        }
+
+        .buy-btn.real-money {
+            background: #FF9800;
+        }
+
+        .buy-btn.real-money:hover {
+            background: #F57C00;
+        }
+
+        .instructions {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 12px;
+            color: #776E65;
+            font-style: italic;
+        }
+
+        .game-message {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(238, 228, 218, 0.95);
+            border-radius: 10px;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .game-message.active {
+            display: flex;
+        }
+
+        .message-text {
+            font-size: 36px;
+            font-weight: bold;
+            color: #776E65;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .mobile-controls {
+            display: grid;
+            grid-template-areas: 
+                ". up ."
+                "left down right";
+            gap: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .mobile-btn {
+            width: 60px;
+            height: 60px;
+            background: #8F7A66;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .mobile-btn.up { grid-area: up; }
+        .mobile-btn.left { grid-area: left; }
+        .mobile-btn.down { grid-area: down; }
+        .mobile-btn.right { grid-area: right; }
+
+        /* Стили для переключателя языка */
+        #language-switcher {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.95);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 2px solid #bbada0;
+            font-size: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .lang-btn {
+            margin: 2px; 
+            padding: 6px 12px;
+            background: #8F7A66;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .lang-btn:hover {
+            background: #7F6A56;
+        }
+
+        .lang-label {
+            margin-bottom: 5px; 
+            font-weight: bold; 
+            color: #776E65;
+        }
+
+        /* Стили для магазина */
+        .shop-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .shop-overlay.active {
+            display: flex;
+        }
+
+        .shop-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .shop-header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #776E65;
+        }
+
+        .shop-category {
+            margin-bottom: 25px;
+        }
+
+        .shop-category h3 {
+            color: #8F7A66;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #BBADA0;
+            padding-bottom: 5px;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: #FAF8EF;
+            border-radius: 8px;
+        }
+
+        .shop-item-info {
+            flex-grow: 1;
+        }
+
+        .shop-item-name {
+            font-weight: bold;
+            color: #776E65;
+        }
+
+        .shop-item-desc {
+            font-size: 12px;
+            color: #BBADA0;
+        }
+
+        .shop-item-price {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .shop-item-price:hover {
+            background: #45a049;
+        }
+
+        .shop-item-owned {
+            background: #BBADA0;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+
+        .close-shop {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #776E65;
+        }
+
+        /* Стили для бустеров */
+        .boosters-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .booster-btn {
+            background: #FF9800;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .booster-btn:disabled {
+            background: #BBADA0;
+            cursor: not-allowed;
+        }
+
+        /* Темные темы */
+        .theme-dark {
+            background: #2d2d2d;
+            color: #ffffff;
+        }
+
+        .theme-dark .game-title {
+            color: #ffffff;
+        }
+
+        .theme-dark .grid-cell {
+            background: #3d3d3d;
+        }
+
+        .theme-dark .tile-2 { background: #4a4a4a; color: #ffffff; }
+        .theme-dark .tile-4 { background: #5a5a5a; color: #ffffff; }
+
+        .theme-neon .tile-2 { background: #ff00ff; color: #000000; }
+        .theme-neon .tile-4 { background: #00ffff; color: #000000; }
+        .theme-neon .tile-8 { background: #ffff00; color: #000000; }
+
+        .theme-ocean .tile-2 { background: #87CEEB; color: #000000; }
+        .theme-ocean .tile-4 { background: #4682B4; color: #ffffff; }
+
+        .payment-loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+        }
+
+        .payment-loading.active {
+            display: flex;
+        }
+
+        @media (max-width: 500px) {
+            .mobile-controls {
+                display: grid;
+            }
+            
+            .game-title {
+                font-size: 48px;
+            }
+            
+            .tile {
+                font-size: 24px;
+            }
+            
+            .tile-128, .tile-256, .tile-512 {
+                font-size: 20px;
+            }
+            
+            .tile-1024, .tile-2048 {
+                font-size: 18px;
+            }
+
+            #language-switcher {
+                top: 5px;
+                right: 5px;
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
+            .lang-btn {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+
+            .controls {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .new-game-btn, .shop-btn {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Переключатель языка -->
+    <div id="language-switcher">
+        <div class="lang-label">Язык:</div>
+        <button class="lang-btn" onclick="switchLanguage('ru')">Русский</button>
+        <button class="lang-btn" onclick="switchLanguage('en')">English</button>
+    </div>
+
+    <!-- Загрузка платежей -->
+    <div class="payment-loading" id="payment-loading">
+        <div style="font-size: 20px; margin-bottom: 10px;">Обработка платежа...</div>
+        <div style="font-size: 14px;">Пожалуйста, подождите</div>
+    </div>
+
+    <!-- Магазин -->
+    <div class="shop-overlay" id="shop-overlay">
+        <div class="shop-container">
+            <button class="close-shop" onclick="hideShop()">×</button>
+            <div class="shop-header">
+                <h2 id="shop-title">Магазин</h2>
+                <p id="shop-balance">Баланс: <span id="coins-amount">0</span> 🪙</p>
+            </div>
+            
+            <div class="shop-category">
+                <h3>🎨 Темы оформления</h3>
+                <div id="themes-shop"></div>
+            </div>
+            
+            <div class="shop-category">
+                <h3>⚡ Бустеры</h3>
+                <div id="boosters-shop"></div>
+            </div>
+            
+            <div class="shop-category">
+                <h3>🛒 Покупки за деньги</h3>
+                <div id="real-money-shop"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <div class="header">
+            <div class="game-title" id="game-title">2048 - Числовая Головоломка</div>
+        </div>
+
+        <div class="scores-container">
+            <div class="score-box">
+                <div class="score-label" id="score-label">СЧЕТ</div>
+                <div class="score-value" id="score">0</div>
+            </div>
+            <div class="score-box">
+                <div class="score-label" id="best-score-label">РЕКОРД</div>
+                <div class="score-value" id="best-score">0</div>
+            </div>
+            <div class="score-box">
+                <div class="score-label" id="moves-label">ХОДЫ</div>
+                <div class="score-value" id="moves">0</div>
+            </div>
+        </div>
+
+        <!-- Контейнер для бустеров -->
+        <div class="boosters-container" id="boosters-container"></div>
+
+        <div class="game-grid">
+            <div class="grid-container" id="grid-container">
+                <!-- Grid cells will be generated here -->
+            </div>
+            <div class="game-message" id="game-message">
+                <div class="message-text" id="message-text"></div>
+                <div id="reward-message" style="font-size: 18px; margin-bottom: 15px; color: #4CAF50;"></div>
+                <button class="new-game-btn" id="new-game-btn-message">Новая Игра</button>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="new-game-btn" id="new-game-btn">Новая Игра</button>
+            <button class="shop-btn" id="shop-btn">Магазин 🛒</button>
+        </div>
+
+        <div class="mobile-controls">
+            <button class="mobile-btn up" onclick="window.moveUp()">↑</button>
+            <button class="mobile-btn left" onclick="window.moveLeft()">←</button>
+            <button class="mobile-btn down" onclick="window.moveDown()">↓</button>
+            <button class="mobile-btn right" onclick="window.moveRight()">→</button>
+        </div>
+
+        <div class="instructions" id="instructions">
+            Управление: стрелки или WASD • R - перезапуск
+        </div>
+    </div>
+
+    <script>
+        // ==================== VK PLAY SDK ИНИЦИАЛИЗАЦИЯ ====================
+        let vkBridge;
+        
+        // Загрузка VK Bridge
+        async function initializeVKBridge() {
+            try {
+                // VK Bridge для VK Play
+                vkBridge = await import('https://unpkg.com/@vkid/sdk@2.x/dist/index.mjs');
+                VKID.Config.set({
+                    app: window.APP_ID || 0, // ID приложения из VK Play
+                    redirectUrl: window.REDIRECT_URL || 'https://vkplay.ru/'
+                });
+                console.log('VK Bridge initialized');
+                return true;
+            } catch (error) {
+                console.error('VK Bridge error:', error);
+                return false;
+            }
+        }
+
+        // ==================== СИСТЕМА МОНЕТИЗАЦИИ ====================
+        class MonetizationSystem {
+            constructor() {
+                this.coins = parseInt(localStorage.getItem('game-coins')) || 0;
+                this.ownedItems = JSON.parse(localStorage.getItem('owned-items')) || {};
+                this.activeBoosters = JSON.parse(localStorage.getItem('active-boosters')) || {};
+                this.currentTheme = localStorage.getItem('current-theme') || 'default';
+                
+                // Товары для продажи за реальные деньги
+                this.realMoneyProducts = [
+                    { id: 'coins_100', name: '100 монет', desc: 'Небольшой запас монет', price: 99, currency: 'RUB', coins: 100 },
+                    { id: 'coins_300', name: '300 монет', desc: 'Хороший запас монет', price: 249, currency: 'RUB', coins: 300 },
+                    { id: 'coins_1000', name: '1000 монет', desc: 'Огромный запас монет + бонус', price: 699, currency: 'RUB', coins: 1000, bonus: 'theme_special' },
+                    { id: 'premium_pack', name: 'Премиум пак', desc: 'Все темы + 500 монет', price: 500, currency: 'RUB', coins: 500, themes: 'all' },
+                    { id: 'theme_dark', name: 'Темная тема', desc: 'Стильная темная тема', price: 150, currency: 'RUB', theme: 'dark' },
+                    { id: 'theme_neon', name: 'Неоновая тема', desc: 'Яркие неоновые цвета', price: 120, currency: 'RUB', theme: 'neon' },
+                    { id: 'theme_ocean', name: 'Океанская тема', desc: 'Синие оттенки океана', price: 100, currency: 'RUB', theme: 'ocean' },
+                    { id: 'boosters_pack', name: 'Набор бустеров', desc: '5 отмен + 3 удвоения + 5 удачных появлений', price: 200, currency: 'RUB', undo: 5, double: 3, lucky: 5 }
+                ];
+
+                // Товары за игровые монеты
+                this.coinProducts = {
+                    themes: [
+                        { id: 'theme_dark', name: 'Темная тема', desc: 'Стильная темная тема', price: 100 },
+                        { id: 'theme_neon', name: 'Неоновая тема', desc: 'Яркие неоновые цвета', price: 150 },
+                        { id: 'theme_ocean', name: 'Океанская тема', desc: 'Синие оттенки океана', price: 120 }
+                    ],
+                    boosters: [
+                        { id: 'undo', name: 'Отмена хода', desc: 'Вернуть последний ход', price: 50, uses: 3 },
+                        { id: 'double_score', name: 'Удвоение очков', desc: 'x2 очков за 5 ходов', price: 100, duration: 5 },
+                        { id: 'lucky_spawn', name: 'Удачное появление', desc: 'Только 2 и 4 на 10 ходов', price: 80, duration: 10 }
+                    ]
+                };
+            }
+
+            addCoins(amount) {
+                this.coins += amount;
+                this.saveData();
+                this.updateUI();
+            }
+
+            spendCoins(amount) {
+                if (this.coins >= amount) {
+                    this.coins -= amount;
+                    this.saveData();
+                    this.updateUI();
+                    return true;
+                }
+                return false;
+            }
+
+            // Покупка за игровые монеты
+            purchaseWithCoins(productId) {
+                let product = null;
+                let category = null;
+
+                for (const [cat, products] of Object.entries(this.coinProducts)) {
+                    product = products.find(p => p.id === productId);
+                    if (product) {
+                        category = cat;
+                        break;
+                    }
+                }
+
+                if (!product) return false;
+
+                if (this.spendCoins(product.price)) {
+                    if (category === 'themes') {
+                        this.ownedItems[productId] = true;
+                        this.applyTheme(productId);
+                    } else if (category === 'boosters') {
+                        if (!this.activeBoosters[productId]) {
+                            this.activeBoosters[productId] = product.uses || product.duration;
+                        } else {
+                            this.activeBoosters[productId] += product.uses || product.duration;
+                        }
+                    }
+                    
+                    this.saveData();
+                    this.updateShop();
+                    return true;
+                }
+                return false;
+            }
+
+            // Выдача товара купленного за реальные деньги
+            deliverRealMoneyProduct(productId) {
+                const product = this.realMoneyProducts.find(p => p.id === productId);
+                if (!product) return;
+
+                if (product.coins) {
+                    this.addCoins(product.coins);
+                }
+
+                if (product.theme) {
+                    this.ownedItems[`theme_${product.theme}`] = true;
+                    this.applyTheme(`theme_${product.theme}`);
+                }
+
+                if (product.themes === 'all') {
+                    ['theme_dark', 'theme_neon', 'theme_ocean'].forEach(theme => {
+                        this.ownedItems[theme] = true;
+                    });
+                }
+
+                if (product.undo) {
+                    this.activeBoosters.undo = (this.activeBoosters.undo || 0) + product.undo;
+                }
+                if (product.double) {
+                    this.activeBoosters.double_score = (this.activeBoosters.double_score || 0) + product.double;
+                }
+                if (product.lucky) {
+                    this.activeBoosters.lucky_spawn = (this.activeBoosters.lucky_spawn || 0) + product.lucky;
+                }
+
+                this.saveData();
+                this.updateShop();
+                
+                alert('Покупка успешна! Товар добавлен в ваш аккаунт.');
+            }
+
+            applyTheme(themeId) {
+                document.body.className = themeId;
+                this.currentTheme = themeId;
+                localStorage.setItem('current-theme', themeId);
+            }
+
+            useBooster(boosterId) {
+                if (this.activeBoosters[boosterId] > 0) {
+                    this.activeBoosters[boosterId]--;
+                    if (this.activeBoosters[boosterId] <= 0) {
+                        delete this.activeBoosters[boosterId];
+                    }
+                    this.saveData();
+                    this.updateBoostersUI();
+                    return true;
+                }
+                return false;
+            }
+
+            saveData() {
+                localStorage.setItem('game-coins', this.coins);
+                localStorage.setItem('owned-items', JSON.stringify(this.ownedItems));
+                localStorage.setItem('active-boosters', JSON.stringify(this.activeBoosters));
+            }
+
+            updateUI() {
+                const coinsElement = document.getElementById('coins-amount');
+                if (coinsElement) {
+                    coinsElement.textContent = this.coins;
+                }
+            }
+
+            updateShop() {
+                this.renderThemesShop();
+                this.renderBoostersShop();
+                this.renderRealMoneyShop();
+                this.updateUI();
+            }
+
+            renderThemesShop() {
+                const container = document.getElementById('themes-shop');
+                container.innerHTML = this.coinProducts.themes.map(theme => `
+                    <div class="shop-item">
+                        <div class="shop-item-info">
+                            <div class="shop-item-name">${theme.name}</div>
+                            <div class="shop-item-desc">${theme.desc}</div>
+                        </div>
+                        ${this.ownedItems[theme.id] ? 
+                            '<div class="shop-item-owned">✓ Куплено</div>' :
+                            `<button class="buy-btn" onclick="monetization.purchaseWithCoins('${theme.id}')">${theme.price} 🪙</button>`
+                        }
+                    </div>
+                `).join('');
+            }
+
+            renderBoostersShop() {
+                const container = document.getElementById('boosters-shop');
+                container.innerHTML = this.coinProducts.boosters.map(booster => {
+                    const owned = this.activeBoosters[booster.id] || 0;
+                    return `
+                    <div class="shop-item">
+                        <div class="shop-item-info">
+                            <div class="shop-item-name">${booster.name}</div>
+                            <div class="shop-item-desc">${booster.desc}</div>
+                            ${owned > 0 ? `<div style="font-size: 12px; color: #4CAF50;">В наличии: ${owned}</div>` : ''}
+                        </div>
+                        <button class="buy-btn" onclick="monetization.purchaseWithCoins('${booster.id}')">${booster.price} 🪙</button>
+                    </div>
+                `}).join('');
+            }
+
+            renderRealMoneyShop() {
+                const container = document.getElementById('real-money-shop');
+                container.innerHTML = this.realMoneyProducts.map(product => `
+                    <div class="shop-item">
+                        <div class="shop-item-info">
+                            <div class="shop-item-name">${product.name}</div>
+                            <div class="shop-item-desc">${product.desc}</div>
+                        </div>
+                        <button class="buy-btn real-money" onclick="purchaseRealMoneyProduct('${product.id}')">
+                            ${product.price} ₽
+                        </button>
+                    </div>
+                `).join('');
+            }
+
+            updateBoostersUI() {
+                const container = document.getElementById('boosters-container');
+                const activeBoosters = Object.entries(this.activeBoosters).filter(([_, value]) => value > 0);
+                
+                if (activeBoosters.length > 0) {
+                    container.innerHTML = activeBoosters.map(([boosterId, value]) => {
+                        const boosterNames = {
+                            'undo': 'Отмена хода',
+                            'double_score': 'Удвоение очков', 
+                            'lucky_spawn': 'Удачное появление'
+                        };
+                        return `
+                            <button class="booster-btn" onclick="useBooster('${boosterId}')">
+                                ${boosterNames[boosterId] || boosterId} (${value})
+                            </button>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = '';
+                }
+            }
+        }
+
+        // Глобальная переменная монетизации
+        const monetization = new MonetizationSystem();
+
+        // ==================== VK PLAY ПЛАТЕЖИ ====================
+        async function purchaseRealMoneyProduct(productId) {
+            showPaymentLoading();
+            
+            try {
+                // Эмуляция платежа через VK Play
+                // В реальном приложении здесь будет вызов VK Bridge API
+                console.log('Начинаем покупку:', productId);
+                
+                // Имитация процесса платежа
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // В реальном приложении:
+                // const result = await vkBridge.send('VKWebAppShowOrderBox', {
+                //     app_id: window.APP_ID,
+                //     item: productId
+                // });
+                
+                // if (result.success) {
+                if (true) { // Временно всегда успешно для демо
+                    hidePaymentLoading();
+                    monetization.deliverRealMoneyProduct(productId);
+                    showPaymentSuccess('Покупка успешно завершена!');
+                } else {
+                    throw new Error('Платеж не прошел');
+                }
+                
+            } catch (error) {
+                hidePaymentLoading();
+                console.error('Ошибка платежа:', error);
+                showPaymentError('Ошибка при обработке платежа. Попробуйте еще раз.');
+            }
+        }
+
+        function showPaymentLoading() {
+            document.getElementById('payment-loading').classList.add('active');
+        }
+
+        function hidePaymentLoading() {
+            document.getElementById('payment-loading').classList.remove('active');
+        }
+
+        function showPaymentSuccess(message) {
+            alert('✅ ' + message);
+        }
+
+        function showPaymentError(message) {
+            alert('❌ ' + message);
+        }
+
+        // Функции для работы с бустерами
+        function useBooster(boosterId) {
+            if (monetization.useBooster(boosterId)) {
+                if (boosterId === 'undo') {
+                    alert('Отмена хода активирована!');
+                } else if (boosterId === 'double_score') {
+                    window.game.activateDoubleScore();
+                } else if (boosterId === 'lucky_spawn') {
+                    window.game.activateLuckySpawn();
+                }
+            }
+        }
+
+        function showShop() {
+            document.getElementById('shop-overlay').classList.add('active');
+            monetization.updateShop();
+        }
+
+        function hideShop() {
+            document.getElementById('shop-overlay').classList.remove('active');
+        }
+
+        // ==================== ОСНОВНАЯ ИГРА ====================
+
+        // Глобальные функции для кнопок
+        window.moveUp = function() { 
+            if (window.game && typeof window.game.move === 'function') {
+                window.game.move('up');
+            }
+        }
+        
+        window.moveDown = function() { 
+            if (window.game && typeof window.game.move === 'function') {
+                window.game.move('down');
+            }
+        }
+        
+        window.moveLeft = function() { 
+            if (window.game && typeof window.game.move === 'function') {
+                window.game.move('left');
+            }
+        }
+        
+        window.moveRight = function() { 
+            if (window.game && typeof window.game.move === 'function') {
+                window.game.move('right');
+            }
+        }
+        
+        window.newGame = function() {
+            if (window.game && typeof window.game.newGame === 'function') {
+                window.game.newGame();
+            }
+        }
+
+        // Функция переключения языка
+        function switchLanguage(lang) {
+            applyLanguage(lang);
+            localStorage.setItem('gameLanguage', lang);
+        }
+
+        function applyLanguage(lang) {
+            const translations = {
+                'ru': {
+                    'game-title': '2048 - Числовая Головоломка',
+                    'score-label': 'СЧЕТ',
+                    'best-score-label': 'РЕКОРД', 
+                    'moves-label': 'ХОДЫ',
+                    'instructions': 'Управление: стрелки или WASD • R - перезапуск',
+                    'new-game-btn': 'Новая Игра',
+                    'new-game-btn-message': 'Новая Игра',
+                    'win-message': 'ПОБЕДА! 🎉',
+                    'lose-message': 'ИГРА ОКОНЧЕНА 😔',
+                    'shop-title': 'Магазин',
+                    'shop-balance': 'Баланс:'
+                },
+                'en': {
+                    'game-title': '2048 - Number Puzzle',
+                    'score-label': 'SCORE',
+                    'best-score-label': 'BEST',
+                    'moves-label': 'MOVES', 
+                    'instructions': 'Controls: arrows or WASD • R - restart',
+                    'new-game-btn': 'New Game',
+                    'new-game-btn-message': 'New Game',
+                    'win-message': 'YOU WIN! 🎉',
+                    'lose-message': 'GAME OVER 😔',
+                    'shop-title': 'Shop',
+                    'shop-balance': 'Balance:'
+                }
+            };
+
+            const texts = translations[lang] || translations['ru'];
+            
+            for (const [id, text] of Object.entries(texts)) {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = text;
+                }
+            }
+
+            document.documentElement.lang = lang;
+        }
+
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Инициализируем VK Bridge
+            const vkInitialized = await initializeVKBridge();
+            
+            if (!vkInitialized) {
+                console.log('VK Bridge не загружен, используем локальный режим');
+            }
+
+            // Применяем язык
+            const savedLanguage = localStorage.getItem('gameLanguage') || 'ru';
+            applyLanguage(savedLanguage);
+            
+            // Инициализируем монетизацию
+            monetization.updateUI();
+            monetization.updateBoostersUI();
+            if (monetization.currentTheme !== 'default') {
+                monetization.applyTheme(monetization.currentTheme);
+            }
+            
+            // Запускаем игру
+            initializeGame();
+        });
+
+        function initializeGame() {
+            console.log('Initializing game...');
+            window.game = new Game2048();
+            setupKeyboard();
+            setupButtons();
+            
+            // Назначаем обработчик для кнопки магазина
+            document.getElementById('shop-btn').addEventListener('click', showShop);
+            
+            console.log('Game ready!');
+        }
+
+        // ... остальной код игры (класс Game2048) остается без изменений ...
+        // [Здесь должен быть ваш полный класс Game2048 из предыдущего кода]
+
+        class Game2048 {
+            constructor() {
+                this.grid = [];
+                this.score = 0;
+                this.moves = 0;
+                this.bestScore
