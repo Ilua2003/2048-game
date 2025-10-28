@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payment Callback</title>
+</head>
+<body>
+    <script>
+        // Простой обработчик для VK Play
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentId = urlParams.get('payment_id');
+        const status = urlParams.get('status');
+        
+        if (paymentId && status === 'success') {
+            // Платеж успешен - можно логировать
+            console.log('Payment successful:', paymentId);
+        }
+        
+        // Перенаправляем обратно в игру
+        window.location.href = 'https://ilua2003.github.io/2048-game/';
+    </script>
+</body>
+</html>
