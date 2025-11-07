@@ -6,7 +6,6 @@
     <title>2048 - Числовая Головоломка</title>
     
     <style>
-        /* Все предыдущие стили остаются без изменений */
         * {
             margin: 0;
             padding: 0;
@@ -281,48 +280,9 @@
             font-weight: bold;
         }
 
-        /* Стили для iframe платежного окна */
-        .payment-frame-modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            z-index: 1001;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .payment-frame-container {
-            width: 90%;
-            height: 80%;
-            max-width: 500px;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .payment-frame-header {
-            background: #8F7A66;
-            color: white;
-            padding: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .payment-frame-close {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-        }
-
-        .payment-frame {
-            width: 100%;
-            height: calc(100% - 50px);
-            border: none;
+        .payment-processing {
+            color: #8f7a66;
+            font-size: 16px;
         }
 
         @media (max-width: 500px) {
@@ -447,34 +407,36 @@
             </div>
 
             <!-- Статус платежа -->
-            <div id="payment-status" class="payment-status hidden">
-                <!-- Здесь будет отображаться статус платежа -->
-            </div>
+            <div id="payment-status" class="payment-status hidden"></div>
 
             <button class="close-btn" onclick="hideShop()">Закрыть</button>
         </div>
     </div>
 
-    <!-- Модальное окно для платежного фрейма -->
-    <div id="payment-frame-modal" class="payment-frame-modal">
-        <div class="payment-frame-container">
-            <div class="payment-frame-header">
-                <span>Оплата</span>
-                <button class="payment-frame-close" onclick="closePaymentFrame()">×</button>
-            </div>
-            <iframe id="payment-frame" class="payment-frame" src="about:blank"></iframe>
-        </div>
-    </div>
-
     <script>
-        // Конфигурация VK Play
-        const VK_PLAY_CONFIG = {
-            GMRID: '45886', // Заменить на реальный ID игры
-            SECRET: 'gTxVtY76cuwlsugq', // Заменить на секретный ключ из кабинета разработчика
-            API_URL: 'https://vkplay.ru/app'
-        };
+        // Эмуляция VK Bridge для тестирования вне VK Play
+        if (typeof vkBridge === 'undefined') {
+            console.log('VK Bridge не обнаружен, включаем эмуляцию...');
+            window.vkBridge = {
+                send: (method, params) => {
+                    console.log('VK Bridge call:', method, params);
+                    if (method === 'VKWebAppShowOrderBox') {
+                        return new Promise((resolve) => {
+                            const userConfirmed = confirm(`ТЕСТ: ${params.title} за ${params.price} руб?\n\nВ VK Play откроется настоящее платежное окно с СБП, картами и QR-кодом.`);
+                            setTimeout(() => {
+                                resolve({ 
+                                    success: userConfirmed,
+                                    order_id: 'test_order_' + Date.now()
+                                });
+                            }, 1000);
+                        });
+                    }
+                    return Promise.resolve({});
+                }
+            };
+        }
 
-        // Система монетизации с настоящими платежами VK Play
+        // Система монетизации с VK Bridge
         class VKPlayIAPManager {
             constructor() {
                 this.products = {
@@ -499,108 +461,40 @@
                 };
             }
 
-            // Генерация подписи для запроса
-            generateSignature(params) {
-                // Сортируем параметры по ключам
-                const sortedParams = Object.keys(params)
-                    .sort()
-                    .map(key => `${key}=${params[key]}`)
-                    .join('');
-                
-                // Добавляем секретный ключ и вычисляем MD5
-                return this.md5(sortedParams + VK_PLAY_CONFIG.SECRET);
-            }
-
-            // Упрощенная MD5 функция (в реальном проекте используйте библиотеку)
-            md5(str) {
-                // Заглушка - в реальном проекте используйте crypto-js или другую библиотеку
-                console.log('MD5 для:', str);
-                return 'test_signature_' + Date.now();
-            }
-
-            // Получение URL платежного окна
-            async getPaymentUrl(productId, userId, userIp) {
+            // Основной метод покупки через VK Bridge
+            async startPurchase(productId) {
                 const product = this.products[productId];
                 if (!product) {
-                    throw new Error('Продукт не найден');
+                    this.showPaymentStatus('error', 'Продукт не найден');
+                    return;
                 }
 
-                // Параметры для merchant_param
-                const merchantParams = {
-                    uid: userId,
-                    ip: userIp,
-                    amount: product.price,
-                    currency: "RUB",
-                    description: product.description,
-                    item_id: productId,
-                    additional_param: "2048_game"
-                };
-
-                // Подпись запроса
-                const signature = this.generateSignature({
-                    merchant_param: JSON.stringify(merchantParams)
-                });
-
                 try {
-                    // Формируем URL для запроса платежного окна
-                    const url = `${VK_PLAY_CONFIG.API_URL}/${VK_PLAY_CONFIG.GMRID}/billing/client?sign=${signature}`;
-                    
-                    // Отправляем POST запрос
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: `merchant_param=${encodeURIComponent(JSON.stringify(merchantParams))}`
+                    // Показываем статус обработки
+                    this.showPaymentStatus('processing', 'Открываем платежное окно...');
+
+                    // Вызываем платежное окно VK Play
+                    const result = await vkBridge.send('VKWebAppShowOrderBox', {
+                        type: 'item',
+                        item: productId,
+                        title: product.title,
+                        price: product.price,
+                        description: product.description
                     });
 
-                    const data = await response.json();
-                    
-                    if (data.status === 'ok') {
-                        return data.url;
+                    // Обрабатываем результат
+                    if (result.success) {
+                        this.showPaymentStatus('success', 'Платеж успешно завершен!');
+                        setTimeout(() => {
+                            this.handleSuccessfulPayment(productId);
+                        }, 1500);
                     } else {
-                        throw new Error(data.errmsg || 'Ошибка получения платежного URL');
+                        this.showPaymentStatus('error', 'Платеж отменен');
                     }
-                } catch (error) {
-                    console.error('Ошибка при получении платежного URL:', error);
-                    throw error;
-                }
-            }
 
-            // Запуск процесса покупки
-            async startPurchase(productId) {
-                try {
-                    // Получаем данные пользователя (в реальном приложении эти данные должны приходить из VK Play)
-                    const userId = this.getUserId();
-                    const userIp = await this.getUserIp();
-                    
-                    // Получаем URL платежного окна
-                    const paymentUrl = await this.getPaymentUrl(productId, userId, userIp);
-                    
-                    // Показываем платежное окно
-                    this.showPaymentFrame(paymentUrl);
-                    
                 } catch (error) {
-                    this.showPaymentStatus('error', `Ошибка: ${error.message}`);
-                }
-            }
-
-            // Получение ID пользователя (заглушка)
-            getUserId() {
-                // В реальном приложении это должно приходить из VK Play
-                return 'user_' + Math.random().toString(36).substr(2, 9);
-            }
-
-            // Получение IP пользователя (заглушка)
-            async getUserIp() {
-                try {
-                    // Пытаемся получить реальный IP
-                    const response = await fetch('https://api.ipify.org?format=json');
-                    const data = await response.json();
-                    return data.ip;
-                } catch (error) {
-                    // Возвращаем тестовый IP если не удалось получить реальный
-                    return '127.0.0.1';
+                    console.error('Ошибка платежа:', error);
+                    this.showPaymentStatus('error', 'Ошибка при обработке платежа');
                 }
             }
 
@@ -622,42 +516,19 @@
                     statusElement.innerHTML = `<div class="payment-success">✅ ${message}</div>`;
                 } else if (type === 'error') {
                     statusElement.innerHTML = `<div class="payment-error">❌ ${message}</div>`;
+                } else if (type === 'processing') {
+                    statusElement.innerHTML = `<div class="payment-processing">⏳ ${message}</div>`;
                 }
                 
-                setTimeout(() => {
-                    statusElement.classList.add('hidden');
-                }, 5000);
-            }
-
-            showPaymentFrame(url) {
-                const frameModal = document.getElementById('payment-frame-modal');
-                const frame = document.getElementById('payment-frame');
-                
-                frame.src = url;
-                frameModal.style.display = 'flex';
-                
-                // Слушаем сообщения от платежного фрейма
-                window.addEventListener('message', this.handlePaymentMessage.bind(this));
-            }
-
-            handlePaymentMessage(event) {
-                // Обрабатываем сообщения от платежного фрейма
-                if (event.data && event.data.type === 'payment_completed') {
-                    this.handleSuccessfulPayment(event.data.productId);
-                    this.closePaymentFrame();
+                if (type !== 'processing') {
+                    setTimeout(() => {
+                        statusElement.classList.add('hidden');
+                    }, 5000);
                 }
-            }
-
-            closePaymentFrame() {
-                const frameModal = document.getElementById('payment-frame-modal');
-                const frame = document.getElementById('payment-frame');
-                
-                frame.src = 'about:blank';
-                frameModal.style.display = 'none';
             }
         }
 
-        // Система монет (остается без изменений)
+        // Система монет
         class CoinSystem {
             constructor() {
                 this.coins = parseInt(localStorage.getItem('2048-coins')) || 0;
@@ -689,7 +560,7 @@
             }
         }
 
-        // Товары за монеты (остается без изменений)
+        // Товары за монеты
         const coinShopItems = {
             "undo_5": {
                 title: "5 отмен хода",
@@ -753,11 +624,7 @@
             }
         }
 
-        function closePaymentFrame() {
-            window.iapManager.closePaymentFrame();
-        }
-
-        // Основная игра 2048 (остается без изменений)
+        // Основная игра 2048
         class Game2048 {
             constructor() {
                 this.grid = [];
@@ -1012,4 +879,3 @@
     </script>
 </body>
 </html>
-
