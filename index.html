@@ -153,6 +153,112 @@
             color: #776E65;
         }
 
+        /* Стили для магазина */
+        .shop-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .shop-content {
+            background: #faf8ef;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .shop-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .coin-balance {
+            font-size: 18px;
+            font-weight: bold;
+            color: #bbada0;
+            margin: 10px 0;
+        }
+
+        .shop-tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #bbada0;
+        }
+
+        .shop-tabs button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .shop-tabs .tab-active {
+            border-bottom: 3px solid #8f7a66;
+            font-weight: bold;
+        }
+
+        .product {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .product:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .product-icon {
+            font-size: 24px;
+            margin-right: 15px;
+        }
+
+        .product-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .product-price {
+            color: #8f7a66;
+            font-size: 16px;
+        }
+
+        .product-bonus {
+            color: #ff6b6b;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .close-btn {
+            background: #f65e3b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+        }
+
         @media (max-width: 500px) {
             .game-title {
                 font-size: 32px;
@@ -183,6 +289,10 @@
                 <div class="score-label">ХОДЫ</div>
                 <div class="score-value" id="moves">0</div>
             </div>
+            <div class="score-box">
+                <div class="score-label">МОНЕТЫ</div>
+                <div class="score-value" id="coin-count">0</div>
+            </div>
         </div>
 
         <div class="game-grid">
@@ -199,8 +309,242 @@
         </div>
     </div>
 
+    <!-- Модальное окно магазина -->
+    <div id="shop-modal" class="shop-modal">
+        <div class="shop-content">
+            <div class="shop-header">
+                <h2>🛒 Магазин</h2>
+                <div class="coin-balance">
+                    Ваши монеты: <span id="shop-coin-count">0</span> 🪙
+                </div>
+            </div>
+            
+            <div class="shop-tabs">
+                <button class="tab-active" onclick="switchTab('coins')">Купить монеты</button>
+                <button onclick="switchTab('items')">Покупки за монеты</button>
+            </div>
+            
+            <!-- Вкладка покупки монет -->
+            <div id="coins-tab" class="tab-content">
+                <div class="product" onclick="purchaseProduct('coin_pack_small')">
+                    <div class="product-icon">🪙</div>
+                    <div class="product-info">
+                        <div class="product-title">100 монет</div>
+                        <div class="product-price">49 руб</div>
+                    </div>
+                </div>
+                
+                <div class="product" onclick="purchaseProduct('coin_pack_medium')">
+                    <div class="product-icon">💰</div>
+                    <div class="product-info">
+                        <div class="product-title">500 монет</div>
+                        <div class="product-price">199 руб</div>
+                        <div class="product-bonus">+50 бонусных монет!</div>
+                    </div>
+                </div>
+                
+                <div class="product" onclick="purchaseProduct('coin_pack_large')">
+                    <div class="product-icon">💎</div>
+                    <div class="product-info">
+                        <div class="product-title">1200 монет</div>
+                        <div class="product-price">399 руб</div>
+                        <div class="product-bonus">+300 бонусных монет!</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Вкладка товаров за монеты -->
+            <div id="items-tab" class="tab-content hidden">
+                <div class="product" onclick="buyWithCoins('undo_5')">
+                    <div class="product-icon">↩️</div>
+                    <div class="product-info">
+                        <div class="product-title">5 отмен хода</div>
+                        <div class="product-price">100 🪙</div>
+                    </div>
+                </div>
+                
+                <div class="product" onclick="buyWithCoins('hint_3')">
+                    <div class="product-icon">💡</div>
+                    <div class="product-info">
+                        <div class="product-title">3 подсказки</div>
+                        <div class="product-price">150 🪙</div>
+                    </div>
+                </div>
+                
+                <div class="product" onclick="buyWithCoins('special_theme')">
+                    <div class="product-icon">🎨</div>
+                    <div class="product-info">
+                        <div class="product-title">Особая тема</div>
+                        <div class="product-price">300 🪙</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="close-btn" onclick="hideShop()">Закрыть</button>
+        </div>
+    </div>
+
     <script>
-        // Простая версия игры без монетизации (для начала)
+        // Система монетизации
+        class IAPManager {
+            constructor() {
+                this.products = {
+                    "coin_pack_small": {
+                        title: "100 монет",
+                        price: 49,
+                        coins: 100
+                    },
+                    "coin_pack_medium": {
+                        title: "500 монет", 
+                        price: 199,
+                        coins: 500
+                    },
+                    "coin_pack_large": {
+                        title: "1200 монет",
+                        price: 399,
+                        coins: 1200
+                    }
+                };
+            }
+
+            initVKPayments() {
+                // Инициализация VK Payments
+                if (typeof VK !== 'undefined') {
+                    VK.init({
+                        apiId: 1234567 // Заменить на реальный ID приложения
+                    });
+                }
+            }
+
+            purchaseProduct(productId) {
+                const product = this.products[productId];
+                
+                if (typeof VK !== 'undefined' && VK.callMethod) {
+                    VK.callMethod("showOrderBox", {
+                        type: "item",
+                        item: productId,
+                        title: product.title
+                    });
+                } else {
+                    // Эмуляция покупки для тестирования
+                    this.handlePurchase(productId);
+                }
+            }
+
+            handlePurchase(productId) {
+                const product = this.products[productId];
+                if (product && product.coins) {
+                    window.coinSystem.addCoins(product.coins);
+                    alert(`Успешно! Получено ${product.coins} монет!`);
+                }
+            }
+        }
+
+        // Система монет
+        class CoinSystem {
+            constructor() {
+                this.coins = parseInt(localStorage.getItem('2048-coins')) || 0;
+            }
+            
+            addCoins(amount) {
+                this.coins += amount;
+                this.save();
+                this.updateUI();
+            }
+            
+            spendCoins(amount) {
+                if (this.coins >= amount) {
+                    this.coins -= amount;
+                    this.save();
+                    this.updateUI();
+                    return true;
+                }
+                return false;
+            }
+            
+            save() {
+                localStorage.setItem('2048-coins', this.coins);
+            }
+            
+            updateUI() {
+                document.getElementById('coin-count').textContent = this.coins;
+                document.getElementById('shop-coin-count').textContent = this.coins;
+            }
+        }
+
+        // Товары за монеты
+        const coinShopItems = {
+            "undo_5": {
+                title: "5 отмен хода",
+                coins: 100,
+                action: function() {
+                    // Функция добавления отмен хода
+                    alert('Добавлено 5 отмен хода!');
+                }
+            },
+            "hint_3": {
+                title: "3 подсказки", 
+                coins: 150,
+                action: function() {
+                    // Функция добавления подсказок
+                    alert('Добавлено 3 подсказки!');
+                }
+            },
+            "special_theme": {
+                title: "Особая тема",
+                coins: 300,
+                action: function() {
+                    // Функция разблокировки темы
+                    alert('Особая тема разблокирована!');
+                }
+            }
+        };
+
+        // Функции магазина
+        function showShop() {
+            document.getElementById('shop-modal').style.display = 'flex';
+            window.coinSystem.updateUI();
+        }
+
+        function hideShop() {
+            document.getElementById('shop-modal').style.display = 'none';
+        }
+
+        function switchTab(tabName) {
+            // Скрыть все вкладки
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // Убрать активный класс со всех кнопок
+            document.querySelectorAll('.shop-tabs button').forEach(btn => {
+                btn.classList.remove('tab-active');
+            });
+            
+            // Показать выбранную вкладку
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            
+            // Активировать кнопку
+            event.target.classList.add('tab-active');
+        }
+
+        function purchaseProduct(productId) {
+            window.iapManager.purchaseProduct(productId);
+        }
+
+        function buyWithCoins(itemId) {
+            const item = coinShopItems[itemId];
+            const coinSystem = window.coinSystem;
+            
+            if (coinSystem.spendCoins(item.coins)) {
+                item.action();
+            } else {
+                alert("Недостаточно монет!");
+                switchTab('coins');
+            }
+        }
+
+        // Основная игра 2048
         class Game2048 {
             constructor() {
                 this.grid = [];
@@ -270,9 +614,7 @@
                     this.newGame();
                 });
 
-                document.getElementById('shop-btn').addEventListener('click', () => {
-                    alert('Магазин будет добавлен позже!');
-                });
+                document.getElementById('shop-btn').addEventListener('click', showShop);
 
                 document.addEventListener('keydown', (event) => {
                     const key = event.key.toLowerCase();
@@ -442,7 +784,18 @@
 
         // Запускаем игру когда страница загрузится
         document.addEventListener('DOMContentLoaded', function() {
+            // Инициализируем системы монетизации
+            window.iapManager = new IAPManager();
+            window.coinSystem = new CoinSystem();
+            
+            // Инициализируем VK Payments
+            window.iapManager.initVKPayments();
+            
+            // Запускаем игру
             window.game = new Game2048();
+            
+            // Обновляем UI монет
+            window.coinSystem.updateUI();
         });
     </script>
 </body>
