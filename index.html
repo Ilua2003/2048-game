@@ -6,7 +6,6 @@
     <title>2048 - Числовая Головоломка</title>
     
     <style>
-        /* Все предыдущие стили остаются без изменений */
         * {
             margin: 0;
             padding: 0;
@@ -286,50 +285,6 @@
             font-size: 16px;
         }
 
-        /* Стили для iframe платежного окна */
-        .payment-frame-modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            z-index: 1001;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .payment-frame-container {
-            width: 90%;
-            height: 80%;
-            max-width: 500px;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .payment-frame-header {
-            background: #8F7A66;
-            color: white;
-            padding: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .payment-frame-close {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-        }
-
-        .payment-frame {
-            width: 100%;
-            height: calc(100% - 50px);
-            border: none;
-        }
-
         @media (max-width: 500px) {
             .game-title {
                 font-size: 32px;
@@ -458,25 +413,61 @@
         </div>
     </div>
 
-    <!-- Модальное окно для платежного фрейма -->
-    <div id="payment-frame-modal" class="payment-frame-modal">
-        <div class="payment-frame-container">
-            <div class="payment-frame-header">
-                <span>Оплата через VK Play</span>
-                <button class="payment-frame-close" onclick="closePaymentFrame()">×</button>
-            </div>
-            <iframe id="payment-frame" class="payment-frame" src="about:blank"></iframe>
-        </div>
-    </div>
-
     <script>
-        // Конфигурация VK Play
-        const VK_PLAY_CONFIG = {
-            GMRID: '45886',
-            SECRET: 'gTxVtY76cuwlsugq'
-        };
+        // Эмуляция VK Play окружения для тестирования
+        if (typeof vkBridge === 'undefined') {
+            window.vkBridge = {
+                send: (method, params) => {
+                    console.log('VK Bridge call:', method, params);
+                    return new Promise((resolve) => {
+                        if (method === 'VKWebAppShowOrderBox') {
+                            const userConfirmed = confirm(
+                                `ТЕСТ: ${params.title} за ${params.price} руб?\n\n` +
+                                `В VK Play откроется настоящее платежное окно с СБП, картами и QR-кодом.`
+                            );
+                            setTimeout(() => {
+                                resolve({ 
+                                    success: userConfirmed,
+                                    order_id: 'test_order_' + Date.now()
+                                });
+                            }, 1000);
+                        } else {
+                            resolve({ success: true });
+                        }
+                    });
+                }
+            };
+        }
 
-        // Система монетизации с обходом CORS через прокси
+        if (typeof paymentFrame === 'undefined') {
+            window.paymentFrame = (params) => {
+                console.log('paymentFrame called with:', params);
+                return new Promise((resolve) => {
+                    const userConfirmed = confirm(
+                        `ТЕСТ: paymentFrame()\n\n` +
+                        `Параметры:\n` +
+                        `- amount: ${params.merchant_param.amount} руб\n` +
+                        `- description: ${params.merchant_param.description}\n` +
+                        `- currency: ${params.merchant_param.currency}\n\n` +
+                        `В VK Play откроется настоящее платежное окно с СБП.`
+                    );
+                    
+                    if (userConfirmed) {
+                        // Имитация успешного платежа
+                        setTimeout(() => {
+                            if (window.handlePaymentResult) {
+                                window.handlePaymentResult({ type: 'payment_success' });
+                            }
+                            resolve({ success: true });
+                        }, 2000);
+                    } else {
+                        resolve({ success: false });
+                    }
+                });
+            };
+        }
+
+        // Система монетизации с VK Play paymentFrame
         class VKPlayIAPManager {
             constructor() {
                 this.products = {
@@ -484,132 +475,24 @@
                         title: "100 монет",
                         price: 100,
                         coins: 100,
-                        description: "Пакет 100 игровых монет"
+                        description: "Пакет 100 игровых монет для игры 2048"
                     },
                     "coin_pack_2": {
                         title: "500 монет", 
                         price: 450,
                         coins: 500,
-                        description: "Пакет 500 игровых монет"
+                        description: "Пакет 500 игровых монет для игры 2048"
                     },
                     "coin_pack_3": {
                         title: "1200 монет",
                         price: 900,
                         coins: 1200,
-                        description: "Пакет 1200 игровых монет"
+                        description: "Пакет 1200 игровых монет для игры 2048"
                     }
                 };
             }
 
-            // Генерация подписи как в документации
-            generateSignature(params) {
-                const sortedKeys = Object.keys(params).sort();
-                let signString = '';
-                
-                for (const key of sortedKeys) {
-                    signString += key + '=' + params[key];
-                }
-                
-                signString += VK_PLAY_CONFIG.SECRET;
-                return this.simpleMD5(signString);
-            }
-
-            // Упрощенная MD5 для демонстрации
-            simpleMD5(str) {
-                let hash = 0;
-                for (let i = 0; i < str.length; i++) {
-                    const char = str.charCodeAt(i);
-                    hash = ((hash << 5) - hash) + char;
-                    hash = hash & hash;
-                }
-                return Math.abs(hash).toString(16);
-            }
-
-            // Получение платежного URL через CORS-прокси
-            async getPaymentUrl(productId) {
-                const product = this.products[productId];
-                if (!product) {
-                    throw new Error('Продукт не найден');
-                }
-
-                try {
-                    // Получаем IP пользователя
-                    const userIp = await this.getUserIp();
-                    
-                    // Merchant params как в документации
-                    const merchantParams = {
-                        uid: this.getUserId(),
-                        ip: userIp,
-                        amount: product.price,
-                        currency: "RUB",
-                        description: product.description,
-                        item_id: productId,
-                        additional_param: "2048_game"
-                    };
-
-                    // Генерируем подпись
-                    const signature = this.generateSignature({
-                        merchant_param: JSON.stringify(merchantParams)
-                    });
-
-                    // Используем CORS-прокси для обхода ограничений браузера
-                    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-                    const targetUrl = `https://vkplay.ru/app/${VK_PLAY_CONFIG.GMRID}/billing/client?sign=${signature}`;
-                    
-                    console.log('Отправляем запрос через прокси:', targetUrl);
-
-                    const response = await fetch(proxyUrl + targetUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: `merchant_param=${encodeURIComponent(JSON.stringify(merchantParams))}`
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    console.log('Ответ от VK Play:', data);
-                    
-                    if (data.status === 'ok') {
-                        return data.url;
-                    } else {
-                        throw new Error(data.errmsg || `Ошибка VK Play: ${data.errcode}`);
-                    }
-
-                } catch (error) {
-                    console.error('Ошибка при получении платежного URL:', error);
-                    
-                    // Если прокси не работает, используем альтернативный метод
-                    return this.getAlternativePaymentUrl(productId);
-                }
-            }
-
-            // Альтернативный метод если основной не работает
-            getAlternativePaymentUrl(productId) {
-                const product = this.products[productId];
-                
-                // Создаем форму для прямого редиректа
-                const merchantParams = {
-                    uid: this.getUserId(),
-                    ip: '127.0.0.1', // Тестовый IP
-                    amount: product.price,
-                    currency: "RUB",
-                    description: product.description,
-                    item_id: productId
-                };
-
-                const signature = this.generateSignature({
-                    merchant_param: JSON.stringify(merchantParams)
-                });
-
-                // Возвращаем URL для открытия в новом окне
-                return `https://vkplay.ru/app/${VK_PLAY_CONFIG.GMRID}/billing/client?sign=${signature}&merchant_param=${encodeURIComponent(JSON.stringify(merchantParams))}`;
-            }
-
-            // Основной метод покупки
+            // Основной метод покупки через paymentFrame
             async startPurchase(productId) {
                 const product = this.products[productId];
                 if (!product) {
@@ -620,54 +503,31 @@
                 try {
                     this.showPaymentStatus('processing', 'Подготовка платежа...');
 
-                    // Пытаемся получить URL через API
-                    const paymentUrl = await this.getPaymentUrl(productId);
-                    
-                    // Открываем платежное окно
-                    this.openPaymentWindow(paymentUrl, productId);
-                    
+                    // Используем официальный метод paymentFrame
+                    const result = await paymentFrame({
+                        'merchant_param': {
+                            'amount': product.price,
+                            'description': product.description,
+                            'currency': 'RUB',
+                            'item_id': productId,
+                            'user_id': this.getUserId(),
+                            'product_name': product.title,
+                            'game_id': '2048'
+                        }
+                    });
+
+                    if (result && result.success) {
+                        this.showPaymentStatus('success', 'Платеж успешно завершен!');
+                        setTimeout(() => {
+                            this.handleSuccessfulPayment(productId);
+                        }, 1500);
+                    } else {
+                        this.showPaymentStatus('error', 'Платеж отменен');
+                    }
+
                 } catch (error) {
                     console.error('Ошибка платежа:', error);
-                    this.showPaymentStatus('error', 'Ошибка при обработке платежа. Попробуйте позже.');
-                }
-            }
-
-            // Открытие платежного окна
-            openPaymentWindow(url, productId) {
-                // Сохраняем productId для обработки callback
-                window.currentProductId = productId;
-                
-                // Открываем в новом окне
-                const paymentWindow = window.open(url, 'vkplay_payment', 'width=500,height=700,scrollbars=yes');
-                
-                if (!paymentWindow) {
-                    this.showPaymentStatus('error', 'Разрешите всплывающие окна для оплаты');
-                    return;
-                }
-
-                // Проверяем статус окна каждую секунду
-                const checkWindow = setInterval(() => {
-                    if (paymentWindow.closed) {
-                        clearInterval(checkWindow);
-                        this.checkPaymentStatus(productId);
-                    }
-                }, 1000);
-
-                this.showPaymentStatus('processing', 'Открываем платежное окно...');
-            }
-
-            // Проверка статуса платежа после закрытия окна
-            checkPaymentStatus(productId) {
-                // В реальном приложении здесь должен быть запрос к вашему серверу
-                // для проверки статуса платежа через callback от VK Play
-                
-                // Для демонстрации - спрашиваем пользователя
-                const userConfirmed = confirm('Платеж завершен? Если да - монеты будут добавлены.');
-                
-                if (userConfirmed) {
-                    this.handleSuccessfulPayment(productId);
-                } else {
-                    this.showPaymentStatus('error', 'Платеж не завершен');
+                    this.showPaymentStatus('error', 'Ошибка при обработке платежа');
                 }
             }
 
@@ -679,17 +539,6 @@
                     localStorage.setItem('vkplay_user_id', userId);
                 }
                 return userId;
-            }
-
-            // Получение IP пользователя
-            async getUserIp() {
-                try {
-                    const response = await fetch('https://api.ipify.org?format=json');
-                    const data = await response.json();
-                    return data.ip;
-                } catch (error) {
-                    return '127.0.0.1';
-                }
             }
 
             // Обработка успешного платежа
@@ -722,7 +571,6 @@
             }
         }
 
-        // Остальной код без изменений...
         // Система монет
         class CoinSystem {
             constructor() {
@@ -819,11 +667,7 @@
             }
         }
 
-        function closePaymentFrame() {
-            window.iapManager.closePaymentFrame();
-        }
-
-        // Основная игра 2048 (без изменений)
+        // Основная игра 2048
         class Game2048 {
             constructor() {
                 this.grid = [];
