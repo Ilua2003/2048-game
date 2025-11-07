@@ -6,6 +6,7 @@
     <title>2048 - Числовая Головоломка</title>
     
     <style>
+        /* Стили остаются такими же как в вашем коде */
         * {
             margin: 0;
             padding: 0;
@@ -356,7 +357,7 @@
                     <div class="product-icon">🪙</div>
                     <div class="product-info">
                         <div class="product-title">100 монет</div>
-                        <div class="product-price">100 ₽</div>
+                        <div class="product-price" id="price-coin_pack_1">Загрузка...</div>
                     </div>
                 </div>
                 
@@ -364,7 +365,7 @@
                     <div class="product-icon">💰</div>
                     <div class="product-info">
                         <div class="product-title">500 монет</div>
-                        <div class="product-price">450 ₽</div>
+                        <div class="product-price" id="price-coin_pack_2">Загрузка...</div>
                         <div class="product-bonus">Выгода 50 монет!</div>
                     </div>
                 </div>
@@ -373,7 +374,7 @@
                     <div class="product-icon">💎</div>
                     <div class="product-info">
                         <div class="product-title">1200 монет</div>
-                        <div class="product-price">900 ₽</div>
+                        <div class="product-price" id="price-coin_pack_3">Загрузка...</div>
                         <div class="product-bonus">Выгода 300 монет!</div>
                     </div>
                 </div>
@@ -414,110 +415,118 @@
     </div>
 
     <script>
-        // Эмуляция VK Play окружения для тестирования
-        if (typeof vkBridge === 'undefined') {
-            window.vkBridge = {
-                send: (method, params) => {
-                    console.log('VK Bridge call:', method, params);
-                    return new Promise((resolve) => {
-                        if (method === 'VKWebAppShowOrderBox') {
-                            const userConfirmed = confirm(
-                                `ТЕСТ: ${params.title} за ${params.price} руб?\n\n` +
-                                `В VK Play откроется настоящее платежное окно с СБП, картами и QR-кодом.`
-                            );
-                            setTimeout(() => {
-                                resolve({ 
-                                    success: userConfirmed,
-                                    order_id: 'test_order_' + Date.now()
-                                });
-                            }, 1000);
-                        } else {
-                            resolve({ success: true });
-                        }
-                    });
-                }
-            };
-        }
-
-        if (typeof paymentFrame === 'undefined') {
-            window.paymentFrame = (params) => {
-                console.log('paymentFrame called with:', params);
-                return new Promise((resolve) => {
-                    const userConfirmed = confirm(
-                        `ТЕСТ: paymentFrame()\n\n` +
-                        `Параметры:\n` +
-                        `- amount: ${params.merchant_param.amount} руб\n` +
-                        `- description: ${params.merchant_param.description}\n` +
-                        `- currency: ${params.merchant_param.currency}\n\n` +
-                        `В VK Play откроется настоящее платежное окно с СБП.`
-                    );
-                    
-                    if (userConfirmed) {
-                        // Имитация успешного платежа
-                        setTimeout(() => {
-                            if (window.handlePaymentResult) {
-                                window.handlePaymentResult({ type: 'payment_success' });
-                            }
-                            resolve({ success: true });
-                        }, 2000);
-                    } else {
-                        resolve({ success: false });
-                    }
-                });
-            };
-        }
-
-        // Система монетизации с VK Play paymentFrame
-        class VKPlayIAPManager {
+        // Основной класс для работы с VK Play Billing API
+        class VKPlayBillingManager {
             constructor() {
-                this.products = {
-                    "coin_pack_1": {
-                        title: "100 монет",
-                        price: 100,
-                        coins: 100,
-                        description: "Пакет 100 игровых монет для игры 2048"
-                    },
-                    "coin_pack_2": {
-                        title: "500 монет", 
-                        price: 450,
-                        coins: 500,
-                        description: "Пакет 500 игровых монет для игры 2048"
-                    },
-                    "coin_pack_3": {
-                        title: "1200 монет",
-                        price: 900,
-                        coins: 1200,
-                        description: "Пакет 1200 игровых монет для игры 2048"
-                    }
-                };
+                this.isInitialized = false;
+                this.products = new Map();
+                this.initializeBilling();
             }
 
-            // Основной метод покупки через paymentFrame
+            async initializeBilling() {
+                try {
+                    // Проверяем, находимся ли мы в среде VK Play
+                    if (typeof vkBridge === 'undefined') {
+                        console.warn('VK Bridge не обнаружен. Режим тестирования.');
+                        this.setupTestEnvironment();
+                        return;
+                    }
+
+                    // Инициализация VK Bridge
+                    await vkBridge.send('VKWebAppInit', {});
+                    
+                    // Получаем информацию о пользователе
+                    const userInfo = await vkBridge.send('VKWebAppGetUserInfo', {});
+                    console.log('User info:', userInfo);
+
+                    // Загружаем каталог товаров
+                    await this.loadProducts();
+                    
+                    this.isInitialized = true;
+                    console.log('VK Play Billing инициализирован');
+
+                } catch (error) {
+                    console.error('Ошибка инициализации VK Play Billing:', error);
+                    this.setupTestEnvironment();
+                }
+            }
+
+            async loadProducts() {
+                try {
+                    // В реальном приложении здесь должен быть вызов API для получения товаров
+                    // Для демонстрации используем статические данные
+                    const productList = [
+                        {
+                            id: 'coin_pack_1',
+                            title: '100 монет',
+                            description: 'Пакет из 100 игровых монет',
+                            price: 100,
+                            price_text: '100 ₽',
+                            coins: 100
+                        },
+                        {
+                            id: 'coin_pack_2',
+                            title: '500 монет',
+                            description: 'Пакет из 500 игровых монет',
+                            price: 450,
+                            price_text: '450 ₽',
+                            coins: 500
+                        },
+                        {
+                            id: 'coin_pack_3',
+                            title: '1200 монет',
+                            description: 'Пакет из 1200 игровых монет',
+                            price: 900,
+                            price_text: '900 ₽',
+                            coins: 1200
+                        }
+                    ];
+
+                    productList.forEach(product => {
+                        this.products.set(product.id, product);
+                        this.updateProductUI(product);
+                    });
+
+                } catch (error) {
+                    console.error('Ошибка загрузки товаров:', error);
+                }
+            }
+
+            updateProductUI(product) {
+                const priceElement = document.getElementById(`price-${product.id}`);
+                if (priceElement) {
+                    priceElement.textContent = product.price_text;
+                }
+            }
+
             async startPurchase(productId) {
-                const product = this.products[productId];
+                if (!this.isInitialized) {
+                    this.showPaymentStatus('error', 'Платежная система не инициализирована');
+                    return;
+                }
+
+                const product = this.products.get(productId);
                 if (!product) {
-                    this.showPaymentStatus('error', 'Продукт не найден');
+                    this.showPaymentStatus('error', 'Товар не найден');
                     return;
                 }
 
                 try {
-                    this.showPaymentStatus('processing', 'Подготовка платежа...');
+                    this.showPaymentStatus('processing', 'Инициализация платежа...');
 
-                    // Используем официальный метод paymentFrame
-                    const result = await paymentFrame({
-                        'merchant_param': {
-                            'amount': product.price,
-                            'description': product.description,
-                            'currency': 'RUB',
-                            'item_id': productId,
-                            'user_id': this.getUserId(),
-                            'product_name': product.title,
-                            'game_id': '2048'
-                        }
+                    // Вызов нативного платежного интерфейса VK Play
+                    const result = await vkBridge.send('VKWebAppShowOrderBox', {
+                        type: 'item',
+                        item: productId,
+                        title: product.title,
+                        price: product.price,
+                        description: product.description
                     });
 
-                    if (result && result.success) {
+                    if (result.success) {
                         this.showPaymentStatus('success', 'Платеж успешно завершен!');
+                        
+                        // Обрабатываем успешный платеж
                         setTimeout(() => {
                             this.handleSuccessfulPayment(productId);
                         }, 1500);
@@ -531,23 +540,84 @@
                 }
             }
 
-            // Получение ID пользователя
-            getUserId() {
-                let userId = localStorage.getItem('vkplay_user_id');
-                if (!userId) {
-                    userId = 'user_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('vkplay_user_id', userId);
-                }
-                return userId;
-            }
-
-            // Обработка успешного платежа
             handleSuccessfulPayment(productId) {
-                const product = this.products[productId];
+                const product = this.products.get(productId);
                 if (product && product.coins) {
                     window.coinSystem.addCoins(product.coins);
                     this.showPaymentStatus('success', `Успешно! Получено ${product.coins} монет!`);
+                    
+                    // Здесь можно добавить вызов API для подтверждения платежа
+                    this.confirmPurchase(productId);
                 }
+            }
+
+            async confirmPurchase(productId) {
+                try {
+                    // В реальном приложении здесь должен быть вызов вашего бэкенда
+                    // для подтверждения и верификации платежа
+                    console.log('Подтверждение покупки:', productId);
+                    
+                    // Пример вызова API подтверждения
+                    // await fetch('/api/confirm-purchase', {
+                    //     method: 'POST',
+                    //     body: JSON.stringify({ productId, userId: this.getUserId() })
+                    // });
+                    
+                } catch (error) {
+                    console.error('Ошибка подтверждения покупки:', error);
+                }
+            }
+
+            getUserId() {
+                // В реальном приложении ID пользователя должен приходить из VK Bridge
+                return localStorage.getItem('vkplay_user_id') || 'demo_user';
+            }
+
+            setupTestEnvironment() {
+                console.log('Настройка тестовой среды...');
+                
+                // Эмуляция VK Bridge для тестирования
+                if (typeof vkBridge === 'undefined') {
+                    window.vkBridge = {
+                        send: (method, params) => {
+                            console.log('VK Bridge call:', method, params);
+                            return new Promise((resolve) => {
+                                if (method === 'VKWebAppShowOrderBox') {
+                                    const userConfirmed = confirm(
+                                        `ТЕСТ: ${params.title}\n` +
+                                        `Цена: ${params.price} руб\n\n` +
+                                        `В реальном приложении откроется нативное платежное окно VK Play`
+                                    );
+                                    
+                                    setTimeout(() => {
+                                        if (userConfirmed) {
+                                            resolve({ 
+                                                success: true,
+                                                order_id: 'test_order_' + Date.now()
+                                            });
+                                        } else {
+                                            resolve({ success: false });
+                                        }
+                                    }, 1000);
+                                } else if (method === 'VKWebAppGetUserInfo') {
+                                    resolve({
+                                        success: true,
+                                        id: 123456,
+                                        first_name: 'Тестовый',
+                                        last_name: 'Пользователь'
+                                    });
+                                } else {
+                                    resolve({ success: true });
+                                }
+                            });
+                        }
+                    };
+                }
+                
+                this.isInitialized = true;
+                
+                // Загружаем тестовые товары
+                setTimeout(() => this.loadProducts(), 500);
             }
 
             showPaymentStatus(type, message) {
@@ -571,7 +641,7 @@
             }
         }
 
-        // Система монет
+        // Система монет (без изменений)
         class CoinSystem {
             constructor() {
                 this.coins = parseInt(localStorage.getItem('2048-coins')) || 0;
@@ -603,7 +673,7 @@
             }
         }
 
-        // Товары за монеты
+        // Товары за монеты (без изменений)
         const coinShopItems = {
             "undo_5": {
                 title: "5 отмен хода",
@@ -652,7 +722,7 @@
         }
 
         function startPurchase(productId) {
-            window.iapManager.startPurchase(productId);
+            window.billingManager.startPurchase(productId);
         }
 
         function buyWithCoins(itemId) {
@@ -667,7 +737,7 @@
             }
         }
 
-        // Основная игра 2048
+        // Основная игра 2048 (без изменений)
         class Game2048 {
             constructor() {
                 this.grid = [];
@@ -907,8 +977,8 @@
 
         // Запускаем игру когда страница загрузится
         document.addEventListener('DOMContentLoaded', function() {
-            // Инициализируем системы монетизации
-            window.iapManager = new VKPlayIAPManager();
+            // Инициализируем системы
+            window.billingManager = new VKPlayBillingManager();
             window.coinSystem = new CoinSystem();
             
             // Запускаем игру
@@ -917,7 +987,7 @@
             // Обновляем UI монет
             window.coinSystem.updateUI();
             
-            console.log('Игра с платежами VK Play готова!');
+            console.log('Игра с VK Play Billing готова!');
         });
     </script>
 </body>
