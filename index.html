@@ -5,11 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>2048 - Числовая Головоломка</title>
     
-    <!-- Подключаем VK Bridge -->
-    <script src="https://unpkg.com/@vkid/sdk@2.0.0/dist/index.js"></script>
+    <!-- VK Play JS API -->
+    <script type="text/javascript" src="//vkplay.ru/app/45886/static/mailru.core.js"></script>
     
     <style>
-        /* Все стили остаются такими же как в твоем оригинальном коде */
         * {
             margin: 0;
             padding: 0;
@@ -289,9 +288,26 @@
             font-size: 16px;
         }
 
-        .loading {
-            opacity: 0.7;
-            pointer-events: none;
+        /* Стили для VK Play оверлея */
+        .vkplay-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1001;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .vkplay-frame {
+            width: 90%;
+            height: 80%;
+            max-width: 400px;
+            max-height: 600px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
         }
 
         @media (max-width: 500px) {
@@ -352,7 +368,6 @@
                 <div class="coin-balance">
                     Ваши монеты: <span id="shop-coin-count">0</span> 🪙
                 </div>
-                <div id="billing-status" class="payment-status hidden"></div>
             </div>
             
             <div class="shop-tabs">
@@ -362,28 +377,28 @@
             
             <!-- Вкладка покупки монет -->
             <div id="coins-tab" class="tab-content">
-                <div class="product" onclick="startPurchase('coin_pack_1')" id="product-coin_pack_1">
+                <div class="product" onclick="startVKPlayPurchase('coins_100')">
                     <div class="product-icon">🪙</div>
                     <div class="product-info">
                         <div class="product-title">100 монет</div>
-                        <div class="product-price" id="price-coin_pack_1">Загрузка...</div>
+                        <div class="product-price">30 ₽</div>
                     </div>
                 </div>
                 
-                <div class="product" onclick="startPurchase('coin_pack_2')" id="product-coin_pack_2">
+                <div class="product" onclick="startVKPlayPurchase('coins_500')">
                     <div class="product-icon">💰</div>
                     <div class="product-info">
                         <div class="product-title">500 монет</div>
-                        <div class="product-price" id="price-coin_pack_2">Загрузка...</div>
+                        <div class="product-price">149 ₽</div>
                         <div class="product-bonus">Выгода 50 монет!</div>
                     </div>
                 </div>
                 
-                <div class="product" onclick="startPurchase('coin_pack_3')" id="product-coin_pack_3">
+                <div class="product" onclick="startVKPlayPurchase('coins_1200')">
                     <div class="product-icon">💎</div>
                     <div class="product-info">
                         <div class="product-title">1200 монет</div>
-                        <div class="product-price" id="price-coin_pack_3">Загрузка...</div>
+                        <div class="product-price">299 ₽</div>
                         <div class="product-bonus">Выгода 300 монет!</div>
                     </div>
                 </div>
@@ -423,250 +438,196 @@
         </div>
     </div>
 
+    <!-- VK Play оверлей для платежей -->
+    <div id="vkplay-overlay" class="vkplay-overlay">
+        <div class="vkplay-frame" id="vkplay-frame">
+            <!-- Здесь будет отображаться платежное окно VK Play -->
+        </div>
+    </div>
+
     <script>
-        // ==================== VK PLAY BILLING MANAGER ====================
-        class VKPlayBillingManager {
+        // =============================================================================
+        // VK PLAY JS API INTEGRATION
+        // =============================================================================
+
+        class VKPlayIntegration {
             constructor() {
                 this.isInitialized = false;
-                this.products = new Map();
-                this.isVKPlayEnvironment = this.detectVKPlayEnvironment();
-            }
-
-            detectVKPlayEnvironment() {
-                // Проверяем различные признаки VK Play окружения
-                return typeof vkBridge !== 'undefined' || 
-                       window.location.href.includes('vkplay') ||
-                       navigator.userAgent.includes('VKPlay');
-            }
-
-            async initialize() {
-                try {
-                    if (this.isVKPlayEnvironment) {
-                        await this.initializeVKBridge();
-                    } else {
-                        this.setupTestEnvironment();
-                    }
-                    
-                    await this.loadProducts();
-                    this.isInitialized = true;
-                    this.showBillingStatus('success', 'Платежная система готова');
-                    
-                } catch (error) {
-                    console.error('Ошибка инициализации платежей:', error);
-                    this.showBillingStatus('error', 'Платежи временно недоступны');
-                    this.setupTestEnvironment();
-                }
-            }
-
-            async initializeVKBridge() {
-                // Инициализация VK Bridge
-                if (typeof vkBridge !== 'undefined') {
-                    await vkBridge.send('VKWebAppInit', {});
-                    console.log('VK Bridge инициализирован');
-                }
-            }
-
-            async loadProducts() {
-                // В реальном приложении здесь должен быть запрос к вашему бэкенду
-                // или к API VK Play для получения актуальных товаров и цен
-                
-                const productList = [
-                    {
-                        id: 'coin_pack_1',
-                        title: '100 монет',
-                        description: 'Пакет из 100 игровых монет для улучшения игры',
-                        price: 100,
-                        price_text: '100 ₽',
+                this.products = {
+                    "coins_100": {
+                        id: "coins_100",
+                        title: "100 монет",
+                        price: 30,
                         coins: 100,
-                        vk_product_id: 'coin_pack_1' // ID товара в VK Play
+                        description: "Пакет 100 игровых монет"
                     },
-                    {
-                        id: 'coin_pack_2',
-                        title: '500 монет',
-                        description: 'Пакет из 500 игровых монет - лучшая цена!',
-                        price: 450,
-                        price_text: '450 ₽',
+                    "coins_500": {
+                        id: "coins_500",
+                        title: "500 монет",
+                        price: 149,
                         coins: 500,
-                        vk_product_id: 'coin_pack_2'
+                        description: "Пакет 500 игровых монет"
                     },
-                    {
-                        id: 'coin_pack_3',
-                        title: '1200 монет',
-                        description: 'Максимальный пакет 1200 монет для профессионалов',
-                        price: 900,
-                        price_text: '900 ₽',
+                    "coins_1200": {
+                        id: "coins_1200",
+                        title: "1200 монет",
+                        price: 299,
                         coins: 1200,
-                        vk_product_id: 'coin_pack_3'
+                        description: "Пакет 1200 игровых монет"
                     }
-                ];
+                };
+                
+                this.init();
+            }
 
-                // Обновляем UI товаров
-                productList.forEach(product => {
-                    this.products.set(product.id, product);
-                    this.updateProductUI(product);
+            async init() {
+                try {
+                    // Инициализация VK Play JS API
+                    if (typeof mailru !== 'undefined' && mailru.core) {
+                        await this.initializeVKPlayAPI();
+                        this.isInitialized = true;
+                        console.log('✅ VK Play JS API инициализирован');
+                    } else {
+                        console.warn('⚠️ VK Play JS API не загружен, используется тестовый режим');
+                        this.setupTestMode();
+                    }
+                } catch (error) {
+                    console.error('❌ Ошибка инициализации VK Play:', error);
+                    this.setupTestMode();
+                }
+            }
+
+            async initializeVKPlayAPI() {
+                return new Promise((resolve, reject) => {
+                    mailru.core.init({
+                        appId: 45886, // Ваш app_id
+                        onInit: (response) => {
+                            if (response.success) {
+                                console.log('🚀 VK Play API успешно инициализирован');
+                                resolve(response);
+                            } else {
+                                reject(new Error('Ошибка инициализации VK Play API'));
+                            }
+                        }
+                    });
                 });
             }
 
-            updateProductUI(product) {
-                const priceElement = document.getElementById(`price-${product.id}`);
-                const productElement = document.getElementById(`product-${product.id}`);
-                
-                if (priceElement) {
-                    priceElement.textContent = product.price_text;
-                }
-                
-                if (productElement) {
-                    productElement.classList.remove('loading');
-                }
+            setupTestMode() {
+                console.log('🔧 Активирован тестовый режим платежей');
+                // В тестовом режиме эмулируем API
+                window.vkPlayPayments = {
+                    showPayment: (productId) => this.processTestPayment(productId)
+                };
             }
 
+            // Основной метод покупки через VK Play
             async startPurchase(productId) {
-                if (!this.isInitialized) {
-                    this.showPaymentStatus('error', 'Платежная система не готова');
-                    return;
-                }
-
-                const product = this.products.get(productId);
+                const product = this.products[productId];
                 if (!product) {
-                    this.showPaymentStatus('error', 'Товар не найден');
+                    this.showPaymentStatus('error', 'Продукт не найден');
                     return;
                 }
 
                 try {
                     this.showPaymentStatus('processing', 'Подготовка платежа...');
 
-                    if (this.isVKPlayEnvironment && typeof vkBridge !== 'undefined') {
+                    if (this.isInitialized && typeof mailru !== 'undefined') {
                         // Реальный платеж через VK Play
-                        await this.processRealPurchase(product);
+                        await this.processVKPlayPayment(productId, product);
                     } else {
                         // Тестовый платеж
-                        await this.processTestPurchase(product);
+                        await this.processTestPayment(productId, product);
                     }
 
                 } catch (error) {
-                    console.error('Ошибка платежа:', error);
+                    console.error('❌ Ошибка платежа:', error);
                     this.showPaymentStatus('error', 'Ошибка при обработке платежа');
                 }
             }
 
-            async processRealPurchase(product) {
-                const result = await vkBridge.send('VKWebAppShowOrderBox', {
-                    type: 'item',
-                    item: product.vk_product_id,
-                    title: product.title,
-                    price: product.price,
-                    description: product.description,
-                    // Дополнительные параметры согласно документации VK Play
-                    metadata: {
-                        game_id: '2048_puzzle_game',
-                        product_type: 'virtual_currency'
+            // Обработка реального платежа через VK Play
+            async processVKPlayPayment(productId, product) {
+                return new Promise((resolve, reject) => {
+                    mailru.payments.showPayment({
+                        item: productId,
+                        onSuccess: (response) => {
+                            console.log('✅ Платеж успешен:', response);
+                            this.handleSuccessfulPayment(productId);
+                            this.showPaymentStatus('success', `Успешно! Получено ${product.coins} монет!`);
+                            resolve(response);
+                        },
+                        onError: (error) => {
+                            console.error('❌ Ошибка платежа:', error);
+                            this.showPaymentStatus('error', 'Платеж не завершен');
+                            reject(error);
+                        },
+                        onCancel: () => {
+                            console.log('⚠️ Платеж отменен пользователем');
+                            this.showPaymentStatus('error', 'Платеж отменен');
+                            resolve(null);
+                        }
+                    });
+                });
+            }
+
+            // Тестовый платеж для разработки
+            async processTestPayment(productId, product) {
+                return new Promise((resolve) => {
+                    const confirmed = confirm(
+                        `ТЕСТОВЫЙ РЕЖИМ ПЛАТЕЖА\n\n` +
+                        `Товар: ${product.title}\n` +
+                        `Цена: ${product.price} руб\n` +
+                        `Описание: ${product.description}\n\n` +
+                        `В реальной среде VK Play откроется платежное окно.\n\n` +
+                        `Имитировать успешный платеж?`
+                    );
+
+                    if (confirmed) {
+                        this.showPaymentStatus('processing', 'Обработка тестового платежа...');
+                        
+                        setTimeout(() => {
+                            this.handleSuccessfulPayment(productId);
+                            this.showPaymentStatus('success', `Успешно! Получено ${product.coins} монет! 🎉`);
+                            resolve({ success: true });
+                        }, 2000);
+                    } else {
+                        this.showPaymentStatus('error', 'Платеж отменен');
+                        resolve(null);
                     }
                 });
-
-                if (result.success) {
-                    await this.handleSuccessfulPayment(product);
-                } else {
-                    this.showPaymentStatus('error', 'Платеж отменен');
-                }
             }
 
-            async processTestPurchase(product) {
-                // Тестовый режим - имитация платежа
-                const userConfirmed = confirm(
-                    `ТЕСТОВЫЙ ПЛАТЕЖ\n\n` +
-                    `Товар: ${product.title}\n` +
-                    `Цена: ${product.price_text}\n` +
-                    `Описание: ${product.description}\n\n` +
-                    `В VK Play откроется настоящее платежное окно.\n` +
-                    `Симулировать успешный платеж?`
-                );
-
-                if (userConfirmed) {
-                    // Имитация задержки платежа
-                    this.showPaymentStatus('processing', 'Обработка платежа...');
-                    
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    await this.handleSuccessfulPayment(product);
-                } else {
-                    this.showPaymentStatus('error', 'Платеж отменен');
-                }
-            }
-
-            async handleSuccessfulPayment(product) {
-                try {
+            // Обработка успешного платежа
+            handleSuccessfulPayment(productId) {
+                const product = this.products[productId];
+                if (product && product.coins) {
                     // Начисляем монеты
                     window.coinSystem.addCoins(product.coins);
                     
-                    // Показываем успех
-                    this.showPaymentStatus('success', `Успешно! Получено ${product.coins} монет!`);
+                    // Сохраняем историю покупок
+                    this.savePurchaseHistory(productId);
                     
-                    // В реальном приложении здесь должен быть вызов к вашему бэкенду
-                    // для подтверждения и верификации платежа
-                    await this.confirmPurchaseWithBackend(product);
-                    
-                } catch (error) {
-                    console.error('Ошибка обработки платежа:', error);
-                    // Даже если подтверждение не удалось, монеты уже начислены
+                    console.log('💰 Начислены монеты:', product.coins);
                 }
             }
 
-            async confirmPurchaseWithBackend(product) {
-                // Заглушка для интеграции с вашим бэкендом
-                // В реальном приложении здесь должен быть fetch запрос
-                console.log('Подтверждение покупки с бэкендом:', product.id);
-                
-                // Пример реального запроса:
-                /*
-                const response = await fetch('/api/confirm-purchase', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        productId: product.id,
-                        userId: this.getUserId(),
-                        orderId: result.order_id, // из VKWebAppShowOrderBox
-                        timestamp: Date.now()
-                    })
+            // Сохранение истории покупок
+            savePurchaseHistory(productId) {
+                const purchases = JSON.parse(localStorage.getItem('vkplay_purchase_history') || '[]');
+                purchases.push({
+                    productId: productId,
+                    date: new Date().toISOString(),
+                    coins: this.products[productId].coins
                 });
-                
-                if (!response.ok) {
-                    throw new Error('Ошибка подтверждения платежа');
-                }
-                */
+                localStorage.setItem('vkplay_purchase_history', JSON.stringify(purchases));
             }
 
-            getUserId() {
-                // В реальном приложении ID пользователя должен приходить из VK Bridge
-                return localStorage.getItem('vkplay_user_id') || 'unknown_user';
-            }
-
-            setupTestEnvironment() {
-                console.log('Режим тестирования активирован');
-                this.isInitialized = true;
-                
-                // Показываем тестовое сообщение
-                this.showBillingStatus('processing', 'Тестовый режим - платежи не реальные');
-            }
-
-            showBillingStatus(type, message) {
-                const statusElement = document.getElementById('billing-status');
-                if (!statusElement) return;
-                
-                statusElement.className = 'payment-status';
-                statusElement.classList.remove('hidden');
-                
-                if (type === 'success') {
-                    statusElement.innerHTML = `<div class="payment-success">✅ ${message}</div>`;
-                } else if (type === 'error') {
-                    statusElement.innerHTML = `<div class="payment-error">❌ ${message}</div>`;
-                } else if (type === 'processing') {
-                    statusElement.innerHTML = `<div class="payment-processing">⏳ ${message}</div>`;
-                }
-            }
-
+            // Отображение статуса платежа
             showPaymentStatus(type, message) {
                 const statusElement = document.getElementById('payment-status');
+                if (!statusElement) return;
+
                 statusElement.className = 'payment-status';
                 statusElement.classList.remove('hidden');
                 
@@ -678,15 +639,24 @@
                     statusElement.innerHTML = `<div class="payment-processing">⏳ ${message}</div>`;
                 }
                 
+                // Автоматическое скрытие через 5 секунд (кроме processing)
                 if (type !== 'processing') {
                     setTimeout(() => {
                         statusElement.classList.add('hidden');
                     }, 5000);
                 }
             }
+
+            // Получение истории покупок
+            getPurchaseHistory() {
+                return JSON.parse(localStorage.getItem('vkplay_purchase_history') || '[]');
+            }
         }
 
-        // ==================== СИСТЕМА МОНЕТ ====================
+        // =============================================================================
+        // СИСТЕМА МОНЕТ
+        // =============================================================================
+
         class CoinSystem {
             constructor() {
                 this.coins = parseInt(localStorage.getItem('2048-coins')) || 0;
@@ -696,9 +666,7 @@
                 this.coins += amount;
                 this.save();
                 this.updateUI();
-                
-                // Показываем анимацию добавления монет
-                this.showCoinAnimation(amount);
+                return this.coins;
             }
             
             spendCoins(amount) {
@@ -711,105 +679,54 @@
                 return false;
             }
             
+            getBalance() {
+                return this.coins;
+            }
+            
             save() {
                 localStorage.setItem('2048-coins', this.coins);
             }
             
             updateUI() {
-                document.getElementById('coin-count').textContent = this.coins;
-                document.getElementById('shop-coin-count').textContent = this.coins;
-            }
-            
-            showCoinAnimation(amount) {
-                // Простая анимация добавления монет
-                const coinElement = document.getElementById('coin-count');
-                if (coinElement) {
-                    coinElement.style.transform = 'scale(1.2)';
-                    setTimeout(() => {
-                        coinElement.style.transform = 'scale(1)';
-                    }, 300);
-                }
+                const coinElements = document.querySelectorAll('#coin-count, #shop-coin-count');
+                coinElements.forEach(element => {
+                    element.textContent = this.coins;
+                });
             }
         }
 
-        // ==================== ТОВАРЫ ЗА МОНЕТЫ ====================
+        // =============================================================================
+        // ТОВАРЫ ЗА МОНЕТЫ
+        // =============================================================================
+
         const coinShopItems = {
             "undo_5": {
                 title: "5 отмен хода",
                 coins: 100,
                 action: function() {
-                    alert('Добавлено 5 отмен хода!');
-                    // Здесь будет логика добавления отмен
+                    alert('✅ Добавлено 5 отмен хода!');
                 }
             },
             "hint_3": {
                 title: "3 подсказки", 
                 coins: 150,
                 action: function() {
-                    alert('Добавлено 3 подсказки!');
-                    // Здесь будет логика добавления подсказок
+                    alert('💡 Добавлено 3 подсказки!');
                 }
             },
             "special_theme": {
                 title: "Особая тема",
                 coins: 300,
                 action: function() {
-                    alert('Особая тема разблокирована!');
-                    // Здесь будет логика смены темы
+                    alert('🎨 Особая тема разблокирована!');
                 }
             }
         };
 
-        // ==================== ГЛОБАЛЬНЫЕ ФУНКЦИИ МАГАЗИНА ====================
-        function showShop() {
-            document.getElementById('shop-modal').style.display = 'flex';
-            window.coinSystem.updateUI();
-        }
+        // =============================================================================
+        // ИГРА 2048
+        // =============================================================================
 
-        function hideShop() {
-            document.getElementById('shop-modal').style.display = 'none';
-        }
-
-        function switchTab(tabName) {
-            // Скрываем все вкладки
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.add('hidden');
-            });
-            
-            // Убираем активный класс со всех кнопок
-            document.querySelectorAll('.shop-tabs button').forEach(btn => {
-                btn.classList.remove('tab-active');
-            });
-            
-            // Показываем выбранную вкладку
-            document.getElementById(tabName + '-tab').classList.remove('hidden');
-            event.target.classList.add('tab-active');
-        }
-
-        function startPurchase(productId) {
-            if (window.billingManager) {
-                window.billingManager.startPurchase(productId);
-            } else {
-                alert('Платежная система не загружена');
-            }
-        }
-
-        function buyWithCoins(itemId) {
-            const item = coinShopItems[itemId];
-            if (!item) return;
-            
-            const coinSystem = window.coinSystem;
-            
-            if (coinSystem.spendCoins(item.coins)) {
-                item.action();
-            } else {
-                alert("Недостаточно монет!");
-                // Переключаем на вкладку покупки монет
-                switchTab('coins');
-            }
-        }
-
-        // ==================== ИГРА 2048 (БЕЗ ИЗМЕНЕНИЙ) ====================
         class Game2048 {
             constructor() {
                 this.grid = [];
@@ -892,6 +809,39 @@
                         case 'r': this.newGame(); break;
                     }
                 });
+
+                // Добавляем свайпы для мобильных устройств
+                this.setupSwipeListeners();
+            }
+
+            setupSwipeListeners() {
+                let touchStartX, touchStartY;
+
+                document.addEventListener('touchstart', (event) => {
+                    touchStartX = event.touches[0].clientX;
+                    touchStartY = event.touches[0].clientY;
+                });
+
+                document.addEventListener('touchend', (event) => {
+                    if (!touchStartX || !touchStartY) return;
+
+                    const touchEndX = event.changedTouches[0].clientX;
+                    const touchEndY = event.changedTouches[0].clientY;
+
+                    const diffX = touchStartX - touchEndX;
+                    const diffY = touchStartY - touchEndY;
+
+                    if (Math.abs(diffX) > Math.abs(diffY)) {
+                        if (diffX > 50) this.move('left');
+                        else if (diffX < -50) this.move('right');
+                    } else {
+                        if (diffY > 50) this.move('up');
+                        else if (diffY < -50) this.move('down');
+                    }
+
+                    touchStartX = null;
+                    touchStartY = null;
+                });
             }
 
             move(direction) {
@@ -906,12 +856,21 @@
 
                 if (moved) {
                     this.moves++;
+                    
+                    // Начисляем монеты за ходы
+                    if (this.moves % 10 === 0) {
+                        window.coinSystem.addCoins(1);
+                    }
+                    
                     this.updateTiles();
                     setTimeout(() => {
                         this.addRandomTile();
                         this.updateDisplay();
+                        this.checkGameOver();
                     }, 150);
                 }
+                
+                return moved;
             }
 
             moveUp() {
@@ -1034,6 +993,22 @@
                 }
             }
 
+            checkGameOver() {
+                // Проверка на завершение игры
+                for (let row = 0; row < this.size; row++) {
+                    for (let col = 0; col < this.size; col++) {
+                        if (this.grid[row][col] === 0) return;
+                        if (col < this.size - 1 && this.grid[row][col] === this.grid[row][col + 1]) return;
+                        if (row < this.size - 1 && this.grid[row][col] === this.grid[row + 1][col]) return;
+                    }
+                }
+                
+                // Если дошли сюда, игра окончена
+                setTimeout(() => {
+                    alert('Игра окончена! Ваш счет: ' + this.score);
+                }, 500);
+            }
+
             newGame() {
                 this.grid = Array(this.size).fill().map(() => Array(this.size).fill(0));
                 this.score = 0;
@@ -1047,28 +1022,67 @@
             }
         }
 
-        // ==================== ЗАПУСК ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ====================
-        document.addEventListener('DOMContentLoaded', async function() {
-            try {
-                // Инициализируем системы
-                window.billingManager = new VKPlayBillingManager();
-                window.coinSystem = new CoinSystem();
-                
-                // Инициализируем платежи
-                await window.billingManager.initialize();
-                
-                // Запускаем игру
-                window.game = new Game2048();
-                
-                // Обновляем UI монет
-                window.coinSystem.updateUI();
-                
-                console.log('🎮 Игра 2048 с VK Play Billing готова!');
-                
-            } catch (error) {
-                console.error('Ошибка запуска игры:', error);
-                alert('Произошла ошибка при загрузке игры. Пожалуйста, обновите страницу.');
+        // =============================================================================
+        // ГЛОБАЛЬНЫЕ ФУНКЦИИ
+        // =============================================================================
+
+        let vkPlayIntegration;
+        let coinSystem;
+        let game;
+
+        // Глобальные функции магазина
+        function showShop() {
+            document.getElementById('shop-modal').style.display = 'flex';
+            coinSystem.updateUI();
+        }
+
+        function hideShop() {
+            document.getElementById('shop-modal').style.display = 'none';
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            document.querySelectorAll('.shop-tabs button').forEach(btn => {
+                btn.classList.remove('tab-active');
+            });
+            
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            event.target.classList.add('tab-active');
+        }
+
+        function startVKPlayPurchase(productId) {
+            if (vkPlayIntegration) {
+                vkPlayIntegration.startPurchase(productId);
+            } else {
+                alert('⚠️ Платежная система не инициализирована');
             }
+        }
+
+        function buyWithCoins(itemId) {
+            const item = coinShopItems[itemId];
+            
+            if (coinSystem.spendCoins(item.coins)) {
+                item.action();
+            } else {
+                alert("❌ Недостаточно монет!");
+                switchTab('coins');
+            }
+        }
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Инициализация систем
+            vkPlayIntegration = new VKPlayIntegration();
+            coinSystem = new CoinSystem();
+            game = new Game2048();
+
+            // Обновление UI
+            coinSystem.updateUI();
+
+            console.log('🎮 Игра 2048 с VK Play интеграцией готова!');
         });
     </script>
 </body>
