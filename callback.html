@@ -1,22 +1,322 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Payment Callback</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Callback - 2048 Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #4CAF50;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.3);
+            border: 2px solid #4CAF50;
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.3);
+            border: 2px solid #f44336;
+        }
+        .info {
+            background: rgba(33, 150, 243, 0.3);
+            border: 2px solid #2196F3;
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <h1>🎮 2048 Game</h1>
+        <h2>Обработка платежа...</h2>
+        
+        <div id="loader" class="loader"></div>
+        
+        <div id="status" class="status info">
+            Проверка статуса платежа...
+        </div>
+        
+        <div id="details" style="display: none; margin-top: 20px; text-align: left;">
+            <h3>Детали платежа:</h3>
+            <pre id="paymentDetails" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 5px; overflow-x: auto;"></pre>
+        </div>
+        
+        <div id="redirectInfo" style="margin-top: 20px; font-size: 14px;">
+            Автоматическое перенаправление через <span id="countdown">5</span> секунд...
+        </div>
+        
+        <button id="manualRedirect" style="display: none; margin-top: 20px; padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            Вернуться в игру
+        </button>
+    </div>
+
     <script>
-        // Простой обработчик для VK Play
-        const urlParams = new URLSearchParams(window.location.search);
-        const paymentId = urlParams.get('payment_id');
-        const status = urlParams.get('status');
-        
-        if (paymentId && status === 'success') {
-            // Платеж успешен - можно логировать
-            console.log('Payment successful:', paymentId);
+        class PaymentCallbackHandler {
+            constructor() {
+                this.redirectUrl = 'https://ilua2003.github.io/2048-game/';
+                this.countdown = 5;
+                this.init();
+            }
+
+            init() {
+                console.log('🔄 Payment callback handler initialized');
+                
+                // Показываем детали платежа
+                this.showPaymentDetails();
+                
+                // Обрабатываем платеж
+                this.processPayment();
+                
+                // Запускаем таймер перенаправления
+                this.startRedirectCountdown();
+                
+                // Настраиваем ручное перенаправление
+                this.setupManualRedirect();
+            }
+
+            showPaymentDetails() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const paymentData = {};
+                
+                // Собираем все параметры из URL
+                urlParams.forEach((value, key) => {
+                    paymentData[key] = value;
+                });
+                
+                console.log('📊 Payment data:', paymentData);
+                
+                // Показываем детали платежа
+                const detailsElement = document.getElementById('paymentDetails');
+                if (detailsElement && Object.keys(paymentData).length > 0) {
+                    detailsElement.textContent = JSON.stringify(paymentData, null, 2);
+                    document.getElementById('details').style.display = 'block';
+                }
+            }
+
+            processPayment() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const paymentId = urlParams.get('payment_id');
+                const status = urlParams.get('status');
+                const orderId = urlParams.get('order_id');
+                const amount = urlParams.get('amount');
+                const currency = urlParams.get('currency');
+
+                console.log('🔍 Processing payment:', {
+                    paymentId,
+                    status,
+                    orderId,
+                    amount,
+                    currency
+                });
+
+                // Проверяем статус платежа
+                if (status === 'success' && paymentId) {
+                    this.handleSuccessfulPayment(paymentId, orderId, amount, currency);
+                } else if (status === 'failed') {
+                    this.handleFailedPayment(paymentId);
+                } else if (status === 'cancelled') {
+                    this.handleCancelledPayment();
+                } else {
+                    this.handleUnknownStatus();
+                }
+            }
+
+            handleSuccessfulPayment(paymentId, orderId, amount, currency) {
+                console.log('✅ Payment successful:', paymentId);
+                
+                // Сохраняем информацию о успешном платеже в localStorage
+                // чтобы основное приложение могло ее прочитать
+                this.savePaymentResult({
+                    success: true,
+                    paymentId: paymentId,
+                    orderId: orderId,
+                    amount: amount,
+                    currency: currency,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Обновляем UI
+                document.getElementById('status').className = 'status success';
+                document.getElementById('status').innerHTML = `
+                    ✅ <strong>Платеж успешно завершен!</strong><br>
+                    ID платежа: ${paymentId}<br>
+                    Сумма: ${amount} ${currency}
+                `;
+                
+                // Скрываем лоадер
+                document.getElementById('loader').style.display = 'none';
+            }
+
+            handleFailedPayment(paymentId) {
+                console.log('❌ Payment failed:', paymentId);
+                
+                this.savePaymentResult({
+                    success: false,
+                    paymentId: paymentId,
+                    error: 'payment_failed',
+                    timestamp: new Date().toISOString()
+                });
+                
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').innerHTML = `
+                    ❌ <strong>Платеж не прошел</strong><br>
+                    Попробуйте еще раз или используйте другой способ оплаты
+                `;
+                
+                document.getElementById('loader').style.display = 'none';
+            }
+
+            handleCancelledPayment() {
+                console.log('⚠️ Payment cancelled by user');
+                
+                this.savePaymentResult({
+                    success: false,
+                    error: 'payment_cancelled',
+                    timestamp: new Date().toISOString()
+                });
+                
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').innerHTML = `
+                    ⚠️ <strong>Платеж отменен</strong><br>
+                    Вы можете повторить попытку в любое время
+                `;
+                
+                document.getElementById('loader').style.display = 'none';
+            }
+
+            handleUnknownStatus() {
+                console.log('❓ Unknown payment status');
+                
+                this.savePaymentResult({
+                    success: false,
+                    error: 'unknown_status',
+                    timestamp: new Date().toISOString()
+                });
+                
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').innerHTML = `
+                    ❓ <strong>Неизвестный статус платежа</strong><br>
+                    Пожалуйста, свяжитесь со службой поддержки
+                `;
+                
+                document.getElementById('loader').style.display = 'none';
+            }
+
+            savePaymentResult(paymentResult) {
+                try {
+                    // Сохраняем в localStorage для основного приложения
+                    localStorage.setItem('vkplay_payment_result', JSON.stringify(paymentResult));
+                    
+                    // Также сохраняем в sessionStorage на случай если localStorage недоступен
+                    sessionStorage.setItem('vkplay_payment_result', JSON.stringify(paymentResult));
+                    
+                    console.log('💾 Payment result saved:', paymentResult);
+                } catch (error) {
+                    console.error('Error saving payment result:', error);
+                }
+            }
+
+            startRedirectCountdown() {
+                const countdownElement = document.getElementById('countdown');
+                const countdownInterval = setInterval(() => {
+                    this.countdown--;
+                    if (countdownElement) {
+                        countdownElement.textContent = this.countdown;
+                    }
+                    
+                    if (this.countdown <= 0) {
+                        clearInterval(countdownInterval);
+                        this.redirectToGame();
+                    }
+                }, 1000);
+            }
+
+            setupManualRedirect() {
+                document.getElementById('manualRedirect').addEventListener('click', () => {
+                    this.redirectToGame();
+                });
+                
+                // Показываем кнопку через 2 секунды
+                setTimeout(() => {
+                    document.getElementById('manualRedirect').style.display = 'inline-block';
+                }, 2000);
+            }
+
+            redirectToGame() {
+                console.log('🔄 Redirecting to game...');
+                
+                // Пытаемся использовать replace чтобы убрать callback из истории браузера
+                try {
+                    window.location.replace(this.redirectUrl);
+                } catch (error) {
+                    // Если replace не работает, используем обычный redirect
+                    window.location.href = this.redirectUrl;
+                }
+            }
         }
-        
-        // Перенаправляем обратно в игру
-        window.location.href = 'https://ilua2003.github.io/2048-game/';
+
+        // Инициализируем обработчик когда страница загружена
+        document.addEventListener('DOMContentLoaded', () => {
+            new PaymentCallbackHandler();
+        });
+
+        // Также обрабатываем сообщения от VK Play если они приходят через postMessage
+        window.addEventListener('message', (event) => {
+            // Проверяем origin для безопасности
+            if (event.origin.includes('vkplay.ru')) {
+                console.log('📨 Message from VK Play:', event.data);
+                
+                if (event.data && event.data.type === 'payment_result') {
+                    // Обрабатываем результат платежа из postMessage
+                    const handler = new PaymentCallbackHandler();
+                    handler.savePaymentResult(event.data);
+                }
+            }
+        });
+
+        // Отправляем сообщение что callback страница загружена
+        window.addEventListener('load', () => {
+            if (window.opener) {
+                // Если открыто в popup/iframe, сообщаем родителю
+                window.opener.postMessage({
+                    type: 'callback_loaded',
+                    url: window.location.href
+                }, '*');
+            }
+        });
     </script>
 </body>
 </html>
