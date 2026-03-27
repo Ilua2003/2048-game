@@ -25,6 +25,28 @@
             max-width: 500px;
             width: 90%;
         }
+        .debug {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            text-align: left;
+            margin-top: 15px;
+            word-break: break-all;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin-top: 15px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
     </style>
 </head>
 <body>
@@ -32,31 +54,53 @@
         <h1>🎮 2048 Game</h1>
         <h2>Обработка платежа...</h2>
         <div id="status">Пожалуйста, подождите</div>
+        <div id="debug" class="debug"></div>
+        <button onclick="window.close()">Закрыть окно</button>
     </div>
 
     <script>
         // Обработка callback от VK Play
         function processVKPlayCallback() {
             const urlParams = new URLSearchParams(window.location.search);
-            const paymentId = urlParams.get('payment_id');
-            const status = urlParams.get('status');
-            const orderId = urlParams.get('order_id');
+            const allParams = Object.fromEntries(urlParams);
             
-            console.log('VK Play Callback:', {
-                paymentId,
-                status,
-                orderId,
-                allParams: Object.fromEntries(urlParams)
-            });
-
+            // Детальное логирование всех параметров
+            console.log('📨 VK Play Callback получен');
+            console.log('🔗 Полный URL:', window.location.href);
+            console.log('📊 Все параметры:', allParams);
+            
+            const debugElement = document.getElementById('debug');
+            debugElement.innerHTML = `
+                <strong>📋 Полученные параметры:</strong><br>
+                ${Object.entries(allParams).map(([key, value]) => 
+                    `${key}: ${value}<br>`
+                ).join('')}
+                <br><strong>🔗 Полный URL:</strong><br>
+                ${window.location.href}
+            `;
+            
+            // Пытаемся определить параметры платежа (разные версии VK Play)
+            const paymentId = urlParams.get('payment_id') || urlParams.get('paymentId') || urlParams.get('id');
+            const status = urlParams.get('status') || urlParams.get('result') || urlParams.get('state');
+            const orderId = urlParams.get('order_id') || urlParams.get('orderId') || urlParams.get('order');
+            const productId = urlParams.get('product_id') || urlParams.get('item');
+            
             const statusElement = document.getElementById('status');
             
-            if (status === 'success' && paymentId) {
+            // Проверяем успешность платежа
+            const isSuccess = status === 'success' || 
+                             status === 'completed' || 
+                             status === 'ok' ||
+                             urlParams.get('success') === 'true' ||
+                             urlParams.get('result') === 'success';
+            
+            if (isSuccess && paymentId) {
                 statusElement.innerHTML = `
                     <div style="color: #4CAF50; font-size: 24px; margin: 20px 0;">
                         ✅ Платеж успешно завершен!
                     </div>
                     <p>ID платежа: ${paymentId}</p>
+                    <p>Товар: ${productId || 'не указан'}</p>
                     <p>Спасибо за покупку! Монеты будут начислены автоматически.</p>
                 `;
                 
@@ -66,8 +110,10 @@
                         type: 'vkplay_payment_success',
                         paymentId: paymentId,
                         orderId: orderId,
+                        productId: productId,
                         timestamp: new Date().toISOString()
                     }, '*');
+                    console.log('📤 Отправлено сообщение в родительское окно');
                 }
                 
                 // Сохраняем в localStorage для основного приложения
@@ -75,33 +121,44 @@
                     success: true,
                     paymentId: paymentId,
                     orderId: orderId,
+                    productId: productId,
                     timestamp: new Date().toISOString()
                 }));
                 
-            } else if (status === 'failed') {
+            } else if (status === 'failed' || status === 'error' || urlParams.get('error')) {
                 statusElement.innerHTML = `
                     <div style="color: #f44336; font-size: 24px; margin: 20px 0;">
                         ❌ Платеж не прошел
                     </div>
+                    <p>Ошибка: ${urlParams.get('error') || status || 'неизвестная ошибка'}</p>
                     <p>Попробуйте еще раз или обратитесь в поддержку.</p>
                 `;
             } else {
                 statusElement.innerHTML = `
                     <div style="color: #ff9800; font-size: 24px; margin: 20px 0;">
-                        ⚠️ Статус платежа неизвестен
+                        ⚠️ Статус платежа: ${status || 'неизвестен'}
                     </div>
-                    <p>Пожалуйста, проверьте историю платежей.</p>
+                    <p>Пожалуйста, проверьте историю платежей в VK Play.</p>
                 `;
             }
-
-            // Автоматическое закрытие через 5 секунд
-            setTimeout(() => {
-                window.close();
-            }, 5000);
         }
 
         // Запускаем обработку при загрузке
         document.addEventListener('DOMContentLoaded', processVKPlayCallback);
+        
+        // Также слушаем сообщения от VK Play
+        window.addEventListener('message', function(event) {
+            console.log('📨 Получено сообщение:', event.data);
+            if (event.data && event.data.type === 'payment_success') {
+                const statusElement = document.getElementById('status');
+                statusElement.innerHTML = `
+                    <div style="color: #4CAF50; font-size: 24px; margin: 20px 0;">
+                        ✅ Платеж успешно завершен!
+                    </div>
+                    <p>Спасибо за покупку!</p>
+                `;
+            }
+        });
     </script>
 </body>
 </html>
