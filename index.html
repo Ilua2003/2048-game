@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="frame-ancestors https://vkplay.ru https://vk.com;">
     <title>2048 - Числовая Головоломка</title>
     
     <style>
-        /* Все предыдущие стили остаются без изменений */
         * {
             margin: 0;
             padding: 0;
@@ -155,7 +153,6 @@
             color: #776E65;
         }
 
-        /* Стили для магазина */
         .shop-modal {
             display: none;
             position: fixed;
@@ -261,7 +258,6 @@
             width: 100%;
         }
 
-        /* Стили для статуса платежа */
         .payment-status {
             text-align: center;
             padding: 20px;
@@ -283,61 +279,10 @@
             font-weight: bold;
         }
 
-        .payment-processing {
-            color: #8f7a66;
-            font-size: 16px;
-        }
-
-        /* Стили для платежного окна */
-        .payment-modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            z-index: 1001;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .payment-frame {
-            width: 90%;
-            height: 80%;
-            max-width: 500px;
-            max-height: 700px;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .payment-frame iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-
-        .payment-header {
-            background: #8F7A66;
-            color: white;
-            padding: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .close-payment {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-        }
-
         @media (max-width: 500px) {
             .game-title {
                 font-size: 32px;
             }
-            
             .tile {
                 font-size: 18px;
             }
@@ -398,7 +343,6 @@
                 <button onclick="switchTab('items')">Покупки за монеты</button>
             </div>
             
-            <!-- Вкладка покупки монет -->
             <div id="coins-tab" class="tab-content">
                 <div class="product" onclick="startVKPlayPurchase('coins_100')">
                     <div class="product-icon">🪙</div>
@@ -427,7 +371,6 @@
                 </div>
             </div>
             
-            <!-- Вкладка товаров за монеты -->
             <div id="items-tab" class="tab-content hidden">
                 <div class="product" onclick="buyWithCoins('undo_5')">
                     <div class="product-icon">↩️</div>
@@ -454,23 +397,8 @@
                 </div>
             </div>
 
-            <!-- Статус платежа -->
-            <div id="payment-status" class="payment-status">
-                <div class="payment-processing">⏳ Обработка платежа...</div>
-            </div>
-
+            <div id="payment-status" class="payment-status"></div>
             <button class="close-btn" onclick="hideShop()">Закрыть</button>
-        </div>
-    </div>
-
-    <!-- Модальное окно для платежного фрейма -->
-    <div id="payment-modal" class="payment-modal">
-        <div class="payment-frame">
-            <div class="payment-header">
-                <span>Оплата через VK Play</span>
-                <button class="close-payment" onclick="closePayment()">×</button>
-            </div>
-            <iframe id="payment-iframe" src="about:blank"></iframe>
         </div>
     </div>
 
@@ -482,14 +410,12 @@
         class CoinSystem {
             constructor() {
                 this.coins = parseInt(localStorage.getItem('2048-coins')) || 0;
-                console.log('💰 Система монет инициализирована. Баланс:', this.coins);
             }
             
             addCoins(amount) {
                 this.coins += amount;
                 this.save();
                 this.updateUI();
-                console.log('💸 Добавлено монет:', amount, 'Новый баланс:', this.coins);
                 return this.coins;
             }
             
@@ -498,185 +424,156 @@
                     this.coins -= amount;
                     this.save();
                     this.updateUI();
-                    console.log('💳 Потрачено монет:', amount, 'Остаток:', this.coins);
                     return true;
                 }
-                console.log('❌ Недостаточно монет. Нужно:', amount, 'Есть:', this.coins);
                 return false;
             }
             
-            getBalance() {
-                return this.coins;
-            }
+            getBalance() { return this.coins; }
             
-            save() {
-                localStorage.setItem('2048-coins', this.coins);
-            }
+            save() { localStorage.setItem('2048-coins', this.coins); }
             
             updateUI() {
-                const coinElements = document.querySelectorAll('#coin-count, #shop-coin-count');
-                coinElements.forEach(element => {
-                    element.textContent = this.coins;
-                });
-                console.log('🔄 UI монет обновлен');
+                document.querySelectorAll('#coin-count, #shop-coin-count')
+                    .forEach(el => el.textContent = this.coins);
             }
         }
 
         // =============================================================================
-        // VK PLAY BILLING CLIENT
+        // VK PLAY BILLING (ДЕМО-ВЕРСИЯ)
         // =============================================================================
 
         class VKPlayBillingClient {
             constructor(coinSystem) {
                 this.coinSystem = coinSystem;
-                this.billingUrl = 'https://ilua2048.rf.gd/billing.php'; // ЗАМЕНИТЕ на ваш URL
                 this.products = {
-                    'coins_100': { coins: 100 },
-                    'coins_500': { coins: 500 },
-                    'coins_1200': { coins: 1200 }
+                    'coins_100': { coins: 100, price: '30 ₽', name: '100 монет' },
+                    'coins_500': { coins: 500, price: '149 ₽', name: '500 монет' },
+                    'coins_1200': { coins: 1200, price: '299 ₽', name: '1200 монет' }
                 };
             }
 
-            async startPurchase(productId) {
-                console.log('🛒 Начинаем покупку:', productId);
-                
+            startPurchase(productId) {
                 const product = this.products[productId];
                 if (!product) {
-                    this.showPaymentStatus('error', 'Продукт не найден');
+                    this.showStatus('error', 'Товар не найден');
                     return;
                 }
-
-                try {
-                    this.showPaymentStatus('processing', 'Получение платежной ссылки...');
-
-                    // Получаем URL платежного окна от сервера
-                    const paymentUrl = await this.getPaymentUrl(productId);
-                    
-                    // Открываем платежное окно
-                    this.openPaymentFrame(paymentUrl);
-                    
-                } catch (error) {
-                    console.error('❌ Ошибка платежа:', error);
-                    this.showPaymentStatus('error', 'Ошибка при обработке платежа: ' + error.message);
-                }
+                
+                hideShop();
+                this.showPaymentModal(product);
             }
-
-            async getPaymentUrl(productId) {
-                const requestData = {
-                    product_id: productId,
-                    user_id: this.getUserId()
+            
+            showPaymentModal(product) {
+                const modal = document.createElement('div');
+                modal.id = 'vkplay-payment-modal';
+                modal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.85);
+                    z-index: 2000;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    font-family: 'Arial', sans-serif;
+                `;
+                
+                modal.innerHTML = `
+                    <div style="
+                        background: #faf8ef;
+                        padding: 25px;
+                        border-radius: 16px;
+                        max-width: 320px;
+                        width: 85%;
+                        text-align: center;
+                        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+                    ">
+                        <div style="font-size: 50px; margin-bottom: 10px;">💳</div>
+                        <h2 style="color: #776E65; margin-bottom: 5px;">VK Play Pay</h2>
+                        <div style="
+                            background: #bbada0; 
+                            color: white; 
+                            padding: 8px; 
+                            border-radius: 8px;
+                            margin: 15px 0;
+                        ">
+                            🪙 ${product.name}<br>
+                            💰 Сумма: ${product.price}
+                        </div>
+                        <p style="color: #776E65; font-size: 14px; margin: 10px 0;">
+                            Нажмите «Оплатить» для получения монет
+                        </p>
+                        <button id="payment-confirm" style="
+                            background: #4CAF50;
+                            color: white;
+                            border: none;
+                            padding: 12px 25px;
+                            font-size: 16px;
+                            font-weight: bold;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            margin: 5px;
+                            width: 100%;
+                        ">✅ Оплатить (демо)</button>
+                        <button id="payment-cancel" style="
+                            background: #8F7A66;
+                            color: white;
+                            border: none;
+                            padding: 10px 20px;
+                            font-size: 14px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            margin: 5px;
+                            width: 100%;
+                        ">❌ Отмена</button>
+                        <p style="font-size: 10px; color: #bbada0; margin-top: 15px;">
+                            🔧 Демо-режим. В реальной версии здесь открывается платежная система VK Play
+                        </p>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                document.getElementById('payment-confirm').onclick = () => {
+                    this.coinSystem.addCoins(product.coins);
+                    modal.remove();
+                    this.showSuccessMessage(product.coins);
                 };
-
-                const response = await fetch(this.billingUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData)
-                });
-
-                if (!response.ok) {
-                    throw new Error('Ошибка сервера: ' + response.status);
-                }
-
-                const result = await response.json();
                 
-                if (result.status !== 'success') {
-                    throw new Error(result.message || 'Неизвестная ошибка');
-                }
-
-                return result.payment_url;
+                document.getElementById('payment-cancel').onclick = () => {
+                    modal.remove();
+                };
             }
-
-            openPaymentFrame(paymentUrl) {
-                console.log('🔗 Открываем платежное окно:', paymentUrl);
-                
-                const iframe = document.getElementById('payment-iframe');
-                const modal = document.getElementById('payment-modal');
-                
-                iframe.src = paymentUrl;
-                modal.style.display = 'flex';
-                
-                // Слушаем сообщения от платежного фрейма
-                window.addEventListener('message', this.handlePaymentMessage.bind(this));
+            
+            showSuccessMessage(coins) {
+                const msg = document.createElement('div');
+                msg.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: #4CAF50;
+                    color: white;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    z-index: 2001;
+                    font-weight: bold;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                `;
+                msg.textContent = `✅ Оплата успешна! Получено ${coins} монет!`;
+                document.body.appendChild(msg);
+                setTimeout(() => msg.remove(), 3000);
             }
-
-            handlePaymentMessage(event) {
-                console.log('📨 Сообщение от платежного фрейма:', event.data);
-                
-                // Обрабатываем успешный платеж
-                if (event.data && event.data.type === 'payment_success') {
-                    this.handleSuccessfulPayment(event.data.productId);
-                    this.closePayment();
-                }
-                
-                // Обрабатываем ошибку платежа
-                if (event.data && event.data.type === 'payment_error') {
-                    this.showPaymentStatus('error', 'Ошибка платежа');
-                    this.closePayment();
-                }
-            }
-
-            handleSuccessfulPayment(productId) {
-                console.log('🎯 Обработка успешного платежа:', productId);
-                
-                const product = this.products[productId];
-                if (product && product.coins) {
-                    console.log('💰 Начисляем монеты:', product.coins);
-                    
-                    if (this.coinSystem) {
-                        const newBalance = this.coinSystem.addCoins(product.coins);
-                        console.log('✅ Монеты добавлены. Новый баланс:', newBalance);
-                    }
-                    
-                    this.showPaymentStatus('success', `Успешно! Получено ${product.coins} монет! 🎉`);
-                    
-                } else {
-                    console.error('❌ Продукт не найден:', productId);
-                }
-            }
-
-            closePayment() {
-                const modal = document.getElementById('payment-modal');
-                const iframe = document.getElementById('payment-iframe');
-                
-                iframe.src = 'about:blank';
-                modal.style.display = 'none';
-            }
-
-            getUserId() {
-                let userId = localStorage.getItem('vkplay_user_id');
-                if (!userId) {
-                    userId = 'user_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('vkplay_user_id', userId);
-                }
-                return userId;
-            }
-
-            showPaymentStatus(type, message) {
-                console.log('📢 Статус платежа:', type, '-', message);
-                
+            
+            showStatus(type, message) {
                 const statusElement = document.getElementById('payment-status');
-                if (!statusElement) {
-                    console.error('❌ Элемент payment-status не найден!');
-                    return;
-                }
-
+                if (!statusElement) return;
                 statusElement.style.display = 'block';
-                
-                if (type === 'success') {
-                    statusElement.innerHTML = `<div class="payment-success">✅ ${message}</div>`;
-                } else if (type === 'error') {
-                    statusElement.innerHTML = `<div class="payment-error">❌ ${message}</div>`;
-                } else if (type === 'processing') {
-                    statusElement.innerHTML = `<div class="payment-processing">⏳ ${message}</div>`;
-                }
-
-                if (type !== 'processing') {
-                    setTimeout(() => {
-                        statusElement.style.display = 'none';
-                    }, 5000);
-                }
+                statusElement.innerHTML = `<div class="payment-${type}">${message}</div>`;
+                setTimeout(() => statusElement.style.display = 'none', 3000);
             }
         }
 
@@ -688,23 +585,17 @@
             "undo_5": {
                 title: "5 отмен хода",
                 coins: 100,
-                action: function() {
-                    alert('✅ Добавлено 5 отмен хода!');
-                }
+                action: function() { alert('✅ Добавлено 5 отмен хода!'); }
             },
             "hint_3": {
                 title: "3 подсказки", 
                 coins: 150,
-                action: function() {
-                    alert('💡 Добавлено 3 подсказки!');
-                }
+                action: function() { alert('💡 Добавлено 3 подсказки!'); }
             },
             "special_theme": {
                 title: "Особая тема",
                 coins: 300,
-                action: function() {
-                    alert('🎨 Особая тема разблокирована!');
-                }
+                action: function() { alert('🎨 Особая тема разблокирована!'); }
             }
         };
 
@@ -728,7 +619,6 @@
                 this.addRandomTile();
                 this.addRandomTile();
                 this.setupEventListeners();
-                console.log('🎮 Игра 2048 инициализирована');
             }
 
             createGrid() {
@@ -776,10 +666,7 @@
             }
 
             setupEventListeners() {
-                document.getElementById('new-game-btn').addEventListener('click', () => {
-                    this.newGame();
-                });
-
+                document.getElementById('new-game-btn').addEventListener('click', () => this.newGame());
                 document.getElementById('shop-btn').addEventListener('click', showShop);
 
                 document.addEventListener('keydown', (event) => {
@@ -798,17 +685,15 @@
 
             setupSwipeListeners() {
                 let touchStartX, touchStartY;
-                document.addEventListener('touchstart', (event) => {
-                    touchStartX = event.touches[0].clientX;
-                    touchStartY = event.touches[0].clientY;
+                document.addEventListener('touchstart', (e) => {
+                    touchStartX = e.touches[0].clientX;
+                    touchStartY = e.touches[0].clientY;
                 });
 
-                document.addEventListener('touchend', (event) => {
+                document.addEventListener('touchend', (e) => {
                     if (!touchStartX || !touchStartY) return;
-                    const touchEndX = event.changedTouches[0].clientX;
-                    const touchEndY = event.changedTouches[0].clientY;
-                    const diffX = touchStartX - touchEndX;
-                    const diffY = touchStartY - touchEndY;
+                    const diffX = touchStartX - e.changedTouches[0].clientX;
+                    const diffY = touchStartY - e.changedTouches[0].clientY;
 
                     if (Math.abs(diffX) > Math.abs(diffY)) {
                         if (diffX > 50) this.move('left');
@@ -943,9 +828,7 @@
             }
 
             updateTiles() {
-                const tiles = document.querySelectorAll('.tile');
-                tiles.forEach(tile => tile.remove());
-
+                document.querySelectorAll('.tile').forEach(tile => tile.remove());
                 for (let row = 0; row < this.size; row++) {
                     for (let col = 0; col < this.size; col++) {
                         if (this.grid[row][col] !== 0) {
@@ -974,10 +857,7 @@
                         if (row < this.size - 1 && this.grid[row][col] === this.grid[row + 1][col]) return;
                     }
                 }
-                
-                setTimeout(() => {
-                    alert('Игра окончена! Ваш счет: ' + this.score);
-                }, 500);
+                setTimeout(() => alert('Игра окончена! Ваш счет: ' + this.score), 500);
             }
 
             newGame() {
@@ -988,7 +868,6 @@
                 this.updateDisplay();
                 this.addRandomTile();
                 this.addRandomTile();
-                console.log('🔄 Новая игра начата');
             }
         }
 
@@ -996,90 +875,50 @@
         // ГЛОБАЛЬНЫЕ ФУНКЦИИ
         // =============================================================================
 
-        let coinSystem = null;
-        let vkPlayBilling = null;
-        let game = null;
+        let coinSystem, vkPlayBilling, game;
 
         function showShop() {
-            console.log('🛒 Открываем магазин');
             document.getElementById('shop-modal').style.display = 'flex';
-            if (coinSystem) {
-                coinSystem.updateUI();
-            }
+            if (coinSystem) coinSystem.updateUI();
         }
 
         function hideShop() {
-            console.log('❌ Закрываем магазин');
             document.getElementById('shop-modal').style.display = 'none';
-            const statusElement = document.getElementById('payment-status');
-            if (statusElement) {
-                statusElement.style.display = 'none';
-            }
-        }
-
-        function closePayment() {
-            const modal = document.getElementById('payment-modal');
-            const iframe = document.getElementById('payment-iframe');
-            iframe.src = 'about:blank';
-            modal.style.display = 'none';
+            document.getElementById('payment-status').style.display = 'none';
         }
 
         function switchTab(tabName) {
-            console.log('📑 Переключаем на вкладку:', tabName);
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.add('hidden');
-            });
-            
-            document.querySelectorAll('.shop-tabs button').forEach(btn => {
-                btn.classList.remove('tab-active');
-            });
-            
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('.shop-tabs button').forEach(btn => btn.classList.remove('tab-active'));
             document.getElementById(tabName + '-tab').classList.remove('hidden');
             event.target.classList.add('tab-active');
         }
 
         function startVKPlayPurchase(productId) {
-            console.log('🛒 Запуск покупки:', productId);
-            if (vkPlayBilling) {
-                vkPlayBilling.startPurchase(productId);
-            } else {
-                alert('⚠️ Платежная система не инициализирована');
-                console.error('❌ VKPlayBilling не инициализирован');
-            }
+            if (vkPlayBilling) vkPlayBilling.startPurchase(productId);
+            else alert('⚠️ Платежная система не инициализирована');
         }
 
         function buyWithCoins(itemId) {
-            console.log('💳 Покупка за монеты:', itemId);
             const item = coinShopItems[itemId];
-            
             if (coinSystem && coinSystem.spendCoins(item.coins)) {
                 item.action();
             } else {
                 alert("❌ Недостаточно монет!");
-                console.log('❌ Недостаточно монет для покупки:', itemId);
                 switchTab('coins');
             }
         }
 
-        // Инициализация при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 Страница загружена, инициализируем системы...');
-            
             coinSystem = new CoinSystem();
             vkPlayBilling = new VKPlayBillingClient(coinSystem);
             game = new Game2048();
-
             coinSystem.updateUI();
-
-            console.log('🎮 Игра 2048 с VK Play Billing готова!');
-            console.log('💰 Текущий баланс монет:', coinSystem.getBalance());
         });
 
         document.addEventListener('click', function(event) {
             const shopModal = document.getElementById('shop-modal');
-            if (event.target === shopModal) {
-                hideShop();
-            }
+            if (event.target === shopModal) hideShop();
         });
     </script>
 </body>
